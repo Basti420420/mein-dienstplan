@@ -1,20 +1,6 @@
-# Mein Dienstplan
+# Mein Dienstplan v0.3
+Mobile-first React/PWA mit deutscher OCR, manueller Korrektur, lokaler Speicherung und ICS-Kalenderexport.
 
-Mobile-first Dienstplan-App für iPhone.
+Start: `npm install` → `npm run dev`
 
-## Aktueller Stand
-- Dienste anlegen, bearbeiten und löschen
-- Datum, Von/Bis, Abteilung und Ösi-Pause
-- Speicherung im Browser (localStorage)
-- Plan-Foto auswählen/kamera
-- `.ics` Kalender-Export
-- iPhone-optimierte Oberfläche
-
-## Start
-```bash
-npm install
-npm run dev
-```
-
-## Nächste Ausbaustufe
-OCR für Dienstplan-Fotos, automatische Zuordnung mehrerer Dienste und echte Push-Erinnerung um 20:30 Uhr.
+Eine zuverlässig täglich um 20:30 zugestellte iPhone-Push benötigt zusätzlich einen Push-Backend-Dienst oder eine native App.
