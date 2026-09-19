@@ -1,3 +1,28 @@
-{"name":"Mein Dienstplan","short_name":"Dienstplan","start_url:"https://basti420420.github.io/mein-dienstplan/""display":"standalone","background_color":"#101114","theme_color":"#101114","lang":"de"}
+{
+  "name": "Mein Dienstplan",
+  "short_name": "Dienstplan",
+  "description": "Dienstplan-Verwaltung mit OCR und Kalenderexport",
+  "start_url": "/mein-dienstplan/",
+  "scope": "/mein-dienstplan/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101114",
+  "theme_color": "#101114",
+  "lang": "de",
+  "icons": [
+    {
+      "src": "/mein-dienstplan/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/mein-dienstplan/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
 
 
