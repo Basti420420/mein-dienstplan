@@ -3,5 +3,5 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   base: '/mein-dienstplan/',
-  plugins: [react()],
+  plugins: [react()], 
 })
