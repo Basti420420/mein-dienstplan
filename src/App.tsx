@@ -1,311 +1,287 @@
-import { usestate, useEffect, useMemo } from
-'react'
+
+import { useEffect, useRef, useState } from "react";
+import Tesseract from "tesseract.js";
+import { enablePush } from "./firebase";
+
 type Shift = {
-  id: string
-  date: string      // YYYY-MM-DD
-  start: string     // HH:MM
-  end: string       // HH:MM
-  note: string
-  type: string      // Früh, Spät, Nacht, etc.
-}
+  id: string;
+  date: string;
+  start: string;
+  end: string;
+  breakIncluded: boolean;
+  department: string;
+  note: string;
+};
 
-const SHIFT_TYPES = ['Früh', 'Spät', 'Nacht', 'Tag', 'Frei', 'Urlaub', 'Krank']
+const STORAGE_KEY = "mein-dienstplan-shifts";
 
-function calcHours(start: string, end: string): number {
-  if (!start || !end) return 0
-  const [sh, sm] = start.split(':').map(Number)
-  const [eh, em] = end.split(':').map(Number)
-  let mins = eh * 60 + em - (sh * 60 + sm)
-  if (mins < 0) mins += 24 * 60 // Nachtschicht
-  return Math.round((mins / 60) * 100) / 100
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso + 'T00:00:00')
-  return d.toLocaleDateString('de-DE', {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-}
-
-function monthKey(iso: string): string {
-  const d = new Date(iso + 'T00:00:00')
-  return d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
-}
-
-function todayISO(): string {
-  const d = new Date()
-  const off = d.getTimezoneOffset()
-  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10)
+function todayString() {
+  const date = new Date();
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
 }
 
 export default function App() {
-  const [shifts, setShifts] = useState<Shift[]>([])
-  const [tab, setTab] = useState<'list' | 'stats' | 'add'>('list')
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [date, setDate] = useState(todayString());
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [breakIncluded, setBreakIncluded] = useState(false);
+  const [department, setDepartment] = useState("Ware");
+  const [note, setNote] = useState("");
+  const [status, setStatus] = useState("");
+  const [ocrText, setOcrText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const [form, setForm] = useState<Omit<Shift, 'id'>>({
-    date: todayISO(),
-    start: '08:00',
-    end: '16:00',
-    note: '',
-    type: 'Früh',
-  })
-
-  // Laden
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('dienstplan')
-      if (raw) setShifts(JSON.parse(raw))
-    } catch (e) {
-      console.error('Ladefehler:', e)
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) setShifts(JSON.parse(saved) as Shift[]);
+    } catch {
+      setStatus("Gespeicherte Schichten konnten nicht geladen werden.");
     }
-  }, [])
+  }, []);
 
-  // Speichern
   useEffect(() => {
-    localStorage.setItem('dienstplan', JSON.stringify(shifts))
-  }, [shifts])
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(shifts));
+  }, [shifts]);
 
-  const sortedShifts = useMemo(
-    () => [...shifts].sort((a, b) => (a.date < b.date ? 1 : -1)),
-    [shifts]
-  )
-
-  const grouped = useMemo(() => {
-    const g: Record<string, Shift[]> = {}
-    for (const s of sortedShifts) {
-      const k = monthKey(s.date)
-      if (!g[k]) g[k] = []
-      g[k].push(s)
-    }
-    return g
-  }, [sortedShifts])
-
-  const stats = useMemo(() => {
-    const now = new Date()
-    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    let totalAll = 0
-    let totalMonth = 0
-    let countMonth = 0
-    for (const s of shifts) {
-      const h = calcHours(s.start, s.end)
-      totalAll += h
-      if (s.date.startsWith(thisMonth)) {
-        totalMonth += h
-        countMonth++
-      }
-    }
-    return {
-      totalAll: Math.round(totalAll * 100) / 100,
-      totalMonth: Math.round(totalMonth * 100) / 100,
-      countMonth,
-      countAll: shifts.length,
-    }
-  }, [shifts])
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.date || !form.start || !form.end) return
-
-    if (editingId) {
-      setShifts(prev => prev.map(s => (s.id === editingId ? { ...form, id: editingId } : s)))
-      setEditingId(null)
-    } else {
-      setShifts(prev => [...prev, { ...form, id: crypto.randomUUID() }])
+  function saveShift() {
+    if (!date || !start || !end) {
+      setStatus("Bitte Datum sowie Anfangs- und Endzeit eingeben.");
+      return;
     }
 
-    setForm({
-      date: todayISO(),
-      start: '08:00',
-      end: '16:00',
-      note: '',
-      type: 'Früh',
-    })
-    setTab('list')
+    const shift: Shift = {
+      id: crypto.randomUUID(),
+      date,
+      start,
+      end,
+      breakIncluded,
+      department,
+      note
+    };
+
+    setShifts(current =>
+      [...current, shift].sort((a, b) =>
+        `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`)
+      )
+    );
+
+    setStatus("Schicht gespeichert.");
+    setNote("");
   }
 
-  function startEdit(s: Shift) {
-    setForm({ date: s.date, start: s.start, end: s.end, note: s.note, type: s.type })
-    setEditingId(s.id)
-    setTab('add')
+  function deleteShift(id: string) {
+    setShifts(current => current.filter(shift => shift.id !== id));
+    setStatus("Schicht gelöscht.");
   }
 
-  function remove(id: string) {
-    if (!confirm('Diesen Eintrag wirklich löschen?')) return
-    setShifts(prev => prev.filter(s => s.id !== id))
+  async function readPhoto(file?: File) {
+    if (!file) return;
+
+    setBusy(true);
+    setStatus("Foto wird gelesen …");
+
+    try {
+      const result = await Tesseract.recognize(file, "deu+eng");
+      setOcrText(result.data.text);
+      setStatus("Texterkennung abgeschlossen. Bitte Angaben prüfen.");
+    } catch {
+      setStatus("Das Foto konnte nicht erkannt werden.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function cancelEdit() {
-    setEditingId(null)
-    setForm({
-      date: todayISO(),
-      start: '08:00',
-      end: '16:00',
-      note: '',
-      type: 'Früh',
-    })
-    setTab('list')
+  async function activatePush() {
+    setStatus("Push-Berechtigung wird angefragt …");
+
+    try {
+      const token = await enablePush();
+
+      // Der Token wird vorerst nur lokal abgelegt.
+      // Für den automatischen Versand muss er sicher an ein Backend
+      // übermittelt und dort einem Nutzer/Gerät zugeordnet werden.
+      localStorage.setItem("mein-dienstplan-fcm-token", token);
+      setStatus("Push wurde aktiviert. Der Token ist auf diesem Gerät gespeichert.");
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Push konnte nicht aktiviert werden."
+      );
+    }
   }
 
   return (
-    <div className="app">
-      <header>
-        <div>
-          <small>Mein Dienstplan</small>
-          <h1>{tab === 'list' ? 'Übersicht' : tab === 'stats' ? 'Statistik' : editingId ? 'Bearbeiten' : 'Neuer Eintrag'}</h1>
-        </div>
+    <main className="app">
+      <header className="hero">
+        <div className="eyebrow">DEIN PERSÖNLICHER SCHICHTPLAN</div>
+        <h1>Mein Dienstplan</h1>
+        <p>Schichten eintragen, Fotos auslesen und den Überblick behalten.</p>
       </header>
 
-      <div className="tabs">
-        <button className={tab === 'list' ? 'active' : ''} onClick={() => setTab('list')}>Liste</button>
-        <button className={tab === 'stats' ? 'active' : ''} onClick={() => setTab('stats')}>Statistik</button>
-        <button className={tab === 'add' ? 'active' : ''} onClick={() => setTab('add')}>Hinzufügen</button>
-      </div>
+      <section className="panel">
+        <h2>Schicht hinzufügen</h2>
 
-      {tab === 'list' && (
-        <>
-          {sortedShifts.length === 0 && (
-            <div className="empty">Noch keine Einträge.<br />Tippe auf „Hinzufügen".</div>
-          )}
-          {Object.entries(grouped).map(([month, list]) => (
-            <div key={month}>
-              <div className="month-header">{month}</div>
-              {list.map(s => {
-                const h = calcHours(s.start, s.end)
-                return (
-                  <div key={s.id} className="shift">
-                    <div className="info">
-                      <div className="date">{formatDate(s.date)} · {s.type}</div>
-                      <div className="time">{s.start} – {s.end}</div>
-                      {s.note && <div className="note">{s.note}</div>}
-                    </div>
-                    <div className="hours">{h.toFixed(2)} h</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <button className="btn secondary" style={{ padding: '6px 10px', fontSize: 12, width: 'auto' }} onClick={() => startEdit(s)}>✎</button>
-                      <button className="btn danger" onClick={() => remove(s.id)}>✕</button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ))}
-        </>
-      )}
+        <label>
+          Datum
+          <input
+            type="date"
+            value={date}
+            onChange={event => setDate(event.target.value)}
+          />
+        </label>
 
-      {tab === 'stats' && (
-        <>
-          <div className="stats">
-            <div className="stat">
-              <div className="value">{stats.totalMonth}</div>
-              <div className="label">Stunden (Monat)</div>
-            </div>
-            <div className="stat">
-              <div className="value">{stats.countMonth}</div>
-              <div className="label">Dienste (Monat)</div>
-            </div>
-            <div className="stat">
-              <div className="value">{stats.totalAll}</div>
-              <div className="label">Stunden gesamt</div>
-            </div>
-            <div className="stat">
-              <div className="value">{stats.countAll}</div>
-              <div className="label">Einträge gesamt</div>
-            </div>
-          </div>
+        <div className="two-columns">
+          <label>
+            Von
+            <input
+              type="time"
+              value={start}
+              onChange={event => setStart(event.target.value)}
+            />
+          </label>
+          <label>
+            Bis
+            <input
+              type="time"
+              value={end}
+              onChange={event => setEnd(event.target.value)}
+            />
+          </label>
+        </div>
 
-          <div className="card">
-            <h2>Monatsübersicht</h2>
-            {Object.entries(grouped).map(([month, list]) => {
-              const sum = list.reduce((a, s) => a + calcHours(s.start, s.end), 0)
-              return (
-                <div key={month} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span>{month}</span>
-                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                    {Math.round(sum * 100) / 100} h · {list.length} Dienste
-                  </span>
+        <label>
+          Abteilung
+          <select
+            value={department}
+            onChange={event => setDepartment(event.target.value)}
+          >
+            <option>Ware</option>
+            <option>Kasse</option>
+            <option>Getränke</option>
+            <option>Backshop</option>
+            <option>Sonstiges</option>
+          </select>
+        </label>
+
+        <label className="check-row">
+          <input
+            type="checkbox"
+            checked={breakIncluded}
+            onChange={event => setBreakIncluded(event.target.checked)}
+          />
+          Ösi-Pause / Pause ist enthalten
+        </label>
+
+        <label>
+          Notiz
+          <input
+            type="text"
+            value={note}
+            onChange={event => setNote(event.target.value)}
+            placeholder="Optional"
+          />
+        </label>
+
+        <button className="primary" onClick={saveShift}>
+          Schicht speichern
+        </button>
+      </section>
+
+      <section className="panel">
+        <h2>Planfoto auslesen</h2>
+        <p className="muted">
+          Wähle ein Foto deines Dienstplans. Der erkannte Text ist ein
+          Vorschlag und sollte kontrolliert werden.
+        </p>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={event => readPhoto(event.target.files?.[0])}
+        />
+
+        <button
+          className="secondary"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+        >
+          {busy ? "Foto wird gelesen …" : "Foto auswählen / aufnehmen"}
+        </button>
+
+        {ocrText && (
+          <label>
+            Erkannter Text – bitte prüfen
+            <textarea
+              rows={8}
+              value={ocrText}
+              onChange={event => setOcrText(event.target.value)}
+            />
+          </label>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <h2>Deine Schichten</h2>
+          <span className="count">{shifts.length}</span>
+        </div>
+
+        {shifts.length === 0 ? (
+          <p className="muted">Noch keine Schichten eingetragen.</p>
+        ) : (
+          <div className="shift-list">
+            {shifts.map(shift => (
+              <article className="shift-card" key={shift.id}>
+                <div className="shift-date">
+                  {new Date(`${shift.date}T12:00:00`).toLocaleDateString(
+                    "de-DE",
+                    { weekday: "short", day: "2-digit", month: "2-digit" }
+                  )}
                 </div>
-              )
-            })}
-            {Object.keys(grouped).length === 0 && <div className="empty">Keine Daten</div>}
+                <div className="shift-info">
+                  <strong>{shift.start} – {shift.end} Uhr</strong>
+                  <span>{shift.department}</span>
+                  <small>
+                    Pause: {shift.breakIncluded ? "Ja" : "Nein"}
+                    {shift.note ? ` · ${shift.note}` : ""}
+                  </small>
+                </div>
+                <button
+                  className="delete"
+                  aria-label="Schicht löschen"
+                  onClick={() => deleteShift(shift.id)}
+                >
+                  Löschen
+                </button>
+              </article>
+            ))}
           </div>
-        </>
-      )}
+        )}
+      </section>
 
-      {tab === 'add' && (
-        <form onSubmit={handleSubmit} className="card">
-          <div className="form-row full">
-            <div>
-              <label>Datum</label>
-              <input
-                type="date"
-                value={form.date}
-                onChange={e => setForm({ ...form, date: e.target.value })}
-                required
-              />
-            </div>
-          </div>
+      <section className="panel push-panel">
+        <h2>Push-Benachrichtigungen</h2>
+        <p className="muted">
+          Aktiviere Benachrichtigungen auf diesem Gerät. Der automatische
+          Versand um 20:30 Uhr benötigt noch einen Firebase-Hintergrunddienst.
+        </p>
+        <button className="secondary" onClick={activatePush}>
+          Push aktivieren
+        </button>
+      </section>
 
-          <div className="form-row full">
-            <div>
-              <label>Art</label>
-              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-                {SHIFT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-          </div>
+      {status && <p className="status" role="status">{status}</p>}
 
-          <div className="form-row">
-            <div>
-              <label>Beginn</label>
-              <input
-                type="time"
-                value={form.start}
-                onChange={e => setForm({ ...form, start: e.target.value })}
-                required
-              />
-            </div>
-            <div>
-              <label>Ende</label>
-              <input
-                type="time"
-                value={form.end}
-                onChange={e => setForm({ ...form, end: e.target.value })}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-row full">
-            <div>
-              <label>Notiz (optional)</label>
-              <input
-                type="text"
-                value={form.note}
-                placeholder="z. B. Spätschicht Filiale 3"
-                onChange={e => setForm({ ...form, note: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-            <button type="submit" className="btn">
-              {editingId ? 'Änderung speichern' : 'Eintrag speichern'}
-            </button>
-            {editingId && (
-              <button type="button" className="btn secondary" onClick={cancelEdit}>
-                Abbrechen
-              </button>
-            )}
-          </div>
-        </form>
-      )}
-
-      {tab === 'list' && (
-        <button className="fab" onClick={() => setTab('add')} aria-label="Neuer Eintrag">+</button>
-      )}
-    </div>
-  )
+      <footer>
+        Mein Dienstplan · Deine Einträge werden lokal in diesem Browser gespeichert.
+      </footer>
+    </main>
+  );
 }
