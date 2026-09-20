@@ -1,26 +1,12 @@
+
 {
   "name": "Mein Dienstplan",
   "short_name": "Dienstplan",
-  "description": "Persönlicher Dienstplan mit Statistiken",
-  "start_url": "/mein-dienstplan/",
-  "scope": "/mein-dienstplan/",
+  "description": "Schichten übersichtlich verwalten",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
-  "lang": "de",
-  "icons": [
-    {
-      "src": "/mein-dienstplan/IMG_1227.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/mein-dienstplan/IMG_1228.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ]
+  "background_color": "#090d16",
+  "theme_color": "#111827",
+  "lang": "de"
 }
