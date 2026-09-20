@@ -1,13 +1,9 @@
 
 import { initializeApp } from "firebase/app";
-import {
-  getMessaging,
-  getToken,
-  isSupported
-} from "firebase/messaging";
+import { getMessaging, getToken, isSupported } from "firebase/messaging";
 
 const firebaseConfig = {
-  apiKey: "DEIN_FIREBASE_API_KEY",
+  apiKey: "AIzaSyCqKmBfKJnsAkLdtfAdgvXHDKKqLq4GLLo",
   authDomain: "mein-dienstplan-4dcff.firebaseapp.com",
   projectId: "mein-dienstplan-4dcff",
   storageBucket: "mein-dienstplan-4dcff.firebasestorage.app",
@@ -18,7 +14,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const vapidKey =
+const vapidKey =
   "BCRdKcorc8dj8hkhQnQrgJOVxUwUckv3edZjgxdWGJDhHDkwrKpmxITPUIi9z5nhqcERomv8eDhdbNRGEZBVdjY";
 
 export async function enablePush(): Promise<string> {
@@ -27,13 +23,13 @@ export async function enablePush(): Promise<string> {
   }
 
   if (!("serviceWorker" in navigator) || !("Notification" in window)) {
-    throw new Error("Service Worker oder Benachrichtigungen werden nicht unterstützt.");
+    throw new Error("Benachrichtigungen werden nicht unterstützt.");
   }
 
   const permission = await Notification.requestPermission();
 
   if (permission !== "granted") {
-    throw new Error("Die Benachrichtigungsberechtigung wurde nicht erteilt.");
+    throw new Error("Benachrichtigungen wurden nicht freigegeben.");
   }
 
   const registration = await navigator.serviceWorker.register(
@@ -41,14 +37,13 @@ export async function enablePush(): Promise<string> {
   );
 
   const messaging = getMessaging(app);
-
   const token = await getToken(messaging, {
     vapidKey,
     serviceWorkerRegistration: registration
   });
 
   if (!token) {
-    throw new Error("Firebase hat keinen Push-Token zurückgegeben.");
+    throw new Error("Es konnte kein Firebase-Push-Token erstellt werden.");
   }
 
   return token;
