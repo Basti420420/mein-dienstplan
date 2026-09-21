@@ -3,8 +3,8 @@
   "name": "Mein Dienstplan",
   "short_name": "Dienstplan",
   "description": "Schichten übersichtlich verwalten",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "https://github.com/Basti420420/mein-dienstplan/",
+  "scope": "https://github.com/Basti420420/mein-dienstplan/"
   "display": "standalone",
   "background_color": "#090d16",
   "theme_color": "#111827",
