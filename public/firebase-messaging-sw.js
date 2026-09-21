@@ -7,7 +7,7 @@ importScripts(
 );
 
 firebase.initializeApp({
-  apiKey: "DEIN_FIREBASE_API_KEY",
+  apiKey: "BCRdKcorc8dj8hkhQnQrgJOVxUwUckv3edZjgxdWGJDhHDkwrKpmxITPUIi9z5nhqcERomv8eDhdbNRGEZBVdjY",
   authDomain: "mein-dienstplan-4dcff.firebaseapp.com",
   projectId: "mein-dienstplan-4dcff",
   storageBucket: "mein-dienstplan-4dcff.firebasestorage.app",
