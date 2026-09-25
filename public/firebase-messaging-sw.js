@@ -1,13 +1,13 @@
-/* Firebase Messaging Service Worker */
+/* Firebase Cloud Messaging Service Worker */
 importScripts(
-  "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"
+  "https://www.gstatic.com/firebasejs/12.3.0/firebase-app-compat.js"
 );
 importScripts(
-  "https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"
+  "https://www.gstatic.com/firebasejs/12.3.0/firebase-messaging-compat.js"
 );
 
 firebase.initializeApp({
-  apiKey: "BCRdKcorc8dj8hkhQnQrgJOVxUwUckv3edZjgxdWGJDhHDkwrKpmxITPUIi9z5nhqcERomv8eDhdbNRGEZBVdjY",
+  apiKey: "AIzaSyCqKmBfKJnsAkLdtfAdgvXHDKKqLq4GLLo",
   authDomain: "mein-dienstplan-4dcff.firebaseapp.com",
   projectId: "mein-dienstplan-4dcff",
   storageBucket: "mein-dienstplan-4dcff.firebasestorage.app",
@@ -20,12 +20,10 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage(payload => {
   const title = payload.notification?.title || "Mein Dienstplan";
-
   const options = {
     body: payload.notification?.body || "Schau dir deinen nächsten Dienst an.",
-    icon: "./icons/icon-192.png",
     data: {
-      url: payload.data?.url || "./"
+      url: payload.data?.url || "/mein-dienstplan/"
     }
   };
 
@@ -36,7 +34,7 @@ self.addEventListener("notificationclick", event => {
   event.notification.close();
 
   const target = new URL(
-    event.notification.data?.url || "./",
+    event.notification.data?.url || "/mein-dienstplan/",
     self.location.origin
   ).href;
 
@@ -48,7 +46,6 @@ self.addEventListener("notificationclick", event => {
           return client.focus();
         }
       }
-
       return clients.openWindow(target);
     })
   );
