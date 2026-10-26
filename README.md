@@ -1,58 +1,28 @@
-# Mein Dienstplan – iPhone & Android (PWA)
+# Mein Dienstplan
 
-Die App ist als installierbare Web-App (PWA) vorbereitet. Sie kann auf iPhone und Android zum Home-Bildschirm hinzugefügt werden. Eine signierte iOS-App-Datei (.ipa) oder Android-APK wird dadurch nicht erzeugt; diese benötigen separate native Builds und ggf. Store-/Signing-Konten.
+Kostenlose mobile Web-App für Kollegen: Wochenplan fotografieren oder hochladen, eigene Mitarbeiterzeilen markieren, Arbeitszeiten per OCR lesen, überprüfen, lokal speichern und als iPhone-/Android-Kalenderdatei exportieren.
 
-## Enthalten
-- Dienstplan manuell erfassen oder Foto/OCR verwenden
-- Abteilung, Uhrzeit, Pause und Notiz speichern
-- Supabase-Datenbank und anonyme Anmeldung
-- Push-Abo im Browser
-- Kalenderexport (.ics)
-- Vorabend-Erinnerung um 20:00 Uhr mit dem Dienst des Folgetags (nach Supabase-Servereinrichtung)
+## Bereitstellen
 
-## Lokal starten / bauen
-1. `npm install`
-2. `.env.example` nach `.env.local` kopieren und Werte eintragen.
-3. `npm run build`
-4. `npm run dev` für die lokale Vorschau.
+1. Alle Dateien einschließlich `.github/workflows/deploy.yml` in den Branch `main` des GitHub-Repositories kopieren.
+2. Repository → **Settings → Pages → Source: GitHub Actions**.
+3. Workflow **Deploy GitHub Pages** ausführen lassen.
+4. Anschließend `https://basti420420.github.io/mein-dienstplan/` öffnen und auf dem Smartphone zum Home-Bildschirm hinzufügen.
 
-## iPhone installieren
-1. Die veröffentlichte App in **Safari** öffnen.
-2. Teilen → **Zum Home-Bildschirm**.
-3. Die App über das neue Home-Bildschirm-Symbol öffnen.
-4. In der App **Push aktivieren** antippen und Mitteilungen erlauben.
+## Verwendung
 
-Web-Push auf iOS benötigt eine unterstützte iOS-Version und die zum Home-Bildschirm hinzugefügte Web-App. Die Website muss über HTTPS erreichbar sein.
+1. Dienstplan als Foto aufnehmen oder Bild hochladen.
+2. Auf dem Foto die gesamte Mitarbeitergruppe (Name, Funktion, Uhrzeiten) vertikal markieren. Linke und rechte Begrenzung der Wochentag-Spalten bei Bedarf anpassen.
+3. Wochenbeginn (Montag) wählen und **Meine Woche erkennen** drücken.
+4. Erkannte Zeiten, Pausen, Abteilungen und Freitage prüfen und korrigieren.
+5. Woche speichern und `.ics` exportieren. Die Kalenderdatei enthält Erinnerungen für Arbeitstage.
 
-## Android installieren
-Die veröffentlichte App in Chrome öffnen → Menü (⋮) → **App installieren** bzw. **Zum Startbildschirm hinzufügen**. Danach Push in der App erlauben.
+## Hinweise und Grenzen
 
-## Supabase: einmalige Einrichtung
-1. Im Supabase SQL Editor `supabase/migrations/0001_init.sql` ausführen.
-2. Authentication → Sign In / Providers → Anonymous Sign-Ins aktivieren.
-3. Edge Function `send-evening-reminders` deployen.
-4. Migration `0002_reminder_settings_security.sql` ausführen.
-5. `cron-setup.sql` nach Einrichtung von Vault ausführen.
-4. `SUPABASE_SERVICE_ROLE_KEY`, `VAPID_PUBLIC_KEY` und `VAPID_PRIVATE_KEY` als Function-Secrets setzen. Den privaten VAPID-Key niemals in die App oder ins Repository schreiben.
-5. Supabase Cron so einrichten, dass die Function alle 5 Minuten aufgerufen wird. Die Function sendet nur um 20:00 Uhr lokaler Gerätezeit und protokolliert pro Benutzer/Schichtdatum, damit es keine doppelten Erinnerungen gibt.
-
-Die Supabase-URL und der Publishable Key sind öffentliche Frontend-Konfiguration. Die Datenbank muss mit den mitgelieferten RLS-Regeln abgesichert sein.
-
-
-## Fertigstellen in Supabase
-
-1. In Supabase → SQL Editor die Datei `supabase/migrations/0002_reminder_settings_security.sql` ausführen.
-2. Für die Edge Function folgende Secrets setzen:
-   - `VAPID_PUBLIC_KEY`
-   - `VAPID_PRIVATE_KEY`
-   - `VAPID_SUBJECT` (z. B. `mailto:deine-mailadresse@example.com`)
-   - `SUPABASE_SERVICE_ROLE_KEY`
-3. Die Function `send-evening-reminders` deployen.
-4. `supabase/cron-setup.sql` ausführen. Der Cron läuft jede Minute; die Function sendet nur zur individuell gespeicherten Uhrzeit.
-5. GitHub Pages: Repository Settings → Pages → Source `GitHub Actions`.
-6. Repository Secrets anlegen:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_PUBLISHABLE_KEY`
-   - `VITE_VAPID_PUBLIC_KEY`
-
-**Wichtig:** Niemals `VAPID_PRIVATE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` oder `.env.local` in GitHub committen.
+- Alle Fotos werden **lokal im Browser** verarbeitet, nicht an einen eigenen Server hochgeladen. Beim ersten Start lädt Tesseract.js das OCR-Modell aus dem Internet.
+- OCR ist experimentell: Perspektive, Knicke und kleine Schrift können zu Fehlern führen. **Alle Ergebnisse vor dem Speichern prüfen.**
+- Die Position der Mitarbeitergruppe kann wiederverwendet werden, aber Fotos sollten ähnlich ausgerichtet sein.
+- Die Schichten bleiben im Browser-LocalStorage auf dem jeweiligen Gerät. Bei Browserdatenlöschung gehen sie verloren.
+- `.ics` ist ein Import, keine laufende bidirektionale Kalendersynchronisierung. Für spätere Änderungen die neuen Termine prüfen, um Duplikate zu vermeiden.
+- Die `VALARM`-Einträge in der `.ics`-Datei werden je nach Kalender-App unterschiedlich unterstützt. Für verlässliche 20:30-Erinnerungen bei **jedem** Dienst ist eventuell eine eigene Kalendereinstellung oder ein Push-Dienst nötig.
+- Keine gemeinsame Ablage, keine Anmeldung, keine Kosten für den Betrieb auf GitHub Pages.

@@ -1,0 +1,1 @@
+{"name":"Mein Dienstplan","short_name":"Dienstplan","description":"Wochenplan fotografieren, eigene Dienste erkennen und Kalender exportieren","start_url":"./","scope":"./","display":"standalone","background_color":"#0b1120","theme_color":"#101827","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
