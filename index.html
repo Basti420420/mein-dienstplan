@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
+  <meta name="description" content="Dienstplan aus Foto erkennen und in den Kalender übernehmen">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <title>Mein Dienstplan</title>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="brand-icon">▦</span><div><strong>Mein Dienstplan</strong><small>Foto → Schichten → Kalender</small></div></div>
+    <button id="install" class="ghost" hidden>Installieren</button>
+  </header>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">DEIN PLAN. DEIN HANDY.</p>
+      <h1>Weniger abtippen.<br><em>Mehr Überblick.</em></h1>
+      <p>Fotografiere den Wochenplan oder lade ein Bild hoch. Markiere einmal deine Zeilen – danach erkennt die App deine Dienste.</p>
+    </section>
+    <section class="card">
+      <div class="section-head"><h2>1 · Foto auswählen</h2><span class="pill">Lokal verarbeitet</span></div>
+      <div class="actions">
+        <label class="btn primary" for="photo" onclick="document.getElementById('photo').setAttribute('capture','environment')">📷 Foto aufnehmen</label>
+        <label class="btn" for="photo" onclick="document.getElementById('photo').removeAttribute('capture')">🖼️ Aus Galerie auswählen</label>
+        <input id="photo" type="file" accept="image/*">
+        <button id="demo" class="ghost">Beispiel anzeigen</button>
+      </div>
+      <p class="hint">Die Bilder werden nicht hochgeladen. Die Texterkennung benötigt beim ersten Mal Internet, um das Sprachmodell zu laden.</p>
+    </section>
+    <section id="selection" class="card" hidden>
+      <h2>2 · Deine Zeilen markieren</h2>
+      <p>Markiere <b>nur die oberste, schmale Zeile mit deinen Arbeits- und Pausenzeiten</b> – nicht die Zeilen „Funktion“ oder „Soll/Plan“. Prüfe, dass die Tages-Spalten von Montag bis Samstag richtig begrenzt sind. Bei diesem Foto ungefähr 18 % bis 97 %.</p>
+      <div id="imageWrap"><canvas id="preview"></canvas><div id="selectionOverlay"></div></div>
+      <div class="two">
+        <label>Beginn der Montag-Spalte (%)<input id="left" type="number" min="5" max="80" value="18"></label>
+        <label>Ende der Samstag-Spalte (%)<input id="right" type="number" min="20" max="100" value="97"></label>
+      </div>
+      <div class="two">
+        <label>Wochenbeginn (Montag)<input id="monday" type="date"></label>
+        <label>Mein Name (optional)<input id="person" type="text" placeholder="z. B. Sebastian"></label>
+      </div>
+      <div class="actions">
+        <button id="recognize" class="btn primary">✨ Meine Woche erkennen</button>
+        <button id="resetSelection" class="ghost">Bereich neu markieren</button>
+      </div>
+      <p id="progress" class="hint" role="status"></p>
+    </section>
+    <section id="results" class="card" hidden>
+      <div class="section-head"><h2>3 · Dienste prüfen</h2><span class="pill">Bitte kontrollieren</span></div>
+      <p class="hint">Die OCR kann Ziffern verwechseln. Bitte vor dem Speichern jeden Tag prüfen, insbesondere Pausen.</p>
+      <div id="editDays"></div>
+      <div class="actions"><button id="save" class="btn primary">✓ Woche speichern</button></div>
+    </section>
+    <section class="card">
+      <div class="section-head"><h2>Meine gespeicherten Dienste</h2><button id="clear" class="ghost danger">Daten löschen</button></div>
+      <div id="saved"><p class="empty">Noch keine Dienste gespeichert.</p></div>
+      <div class="actions">
+        <button id="ics" class="btn" disabled>📅 Kalenderdatei exportieren</button>
+        <button id="share" class="ghost" disabled>Teilen</button>
+      </div>
+      <p class="hint">Die Kalenderdatei enthält eine Erinnerung um 20:30 Uhr am Vorabend jedes Dienstes. Für regelmäßige Erinnerungen auch an freien Tagen wäre später ein Push-Dienst nötig.</p>
+    </section>
+    <footer>Ohne Anmeldung · Keine Foto-Uploads · Daten nur auf diesem Gerät. Bei einem neuen Handy oder gelöschten Browserdaten sind lokal gespeicherte Dienste nicht automatisch wiederherstellbar.</footer>
+  </main>
+  <script src="app.js" defer></script>
+<script>
+/* Erkennung für Center-Shop-Einsatzpläne: nur die oberste Zeitzeile markieren. */
+window.addEventListener('load', () => {
+  window.cropDay = function(index) {
+    const canvas = document.getElementById('preview');
+    const left = Number(document.getElementById('left').value) / 100;
+    const right = Number(document.getElementById('right').value) / 100;
+    if (!selection || !(right > left) || selection.bottom - selection.top < .004) {
+      throw new Error('Markiere nur die schmale Zeile mit deinen Uhrzeiten und prüfe die Spaltengrenzen.');
+    }
+    const x = Math.round(canvas.width * (left + (right-left) * index/6));
+    const y = Math.round(canvas.height * selection.top);
+    const w = Math.round(canvas.width * (right-left)/6);
+    const h = Math.round(canvas.height * (selection.bottom-selection.top));
+    const out = document.createElement('canvas');
+    out.width = Math.max(720, w*5);
+    out.height = Math.max(110, h*5);
+    const ctx = out.getContext('2d', {willReadFrequently:true});
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,out.width,out.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(canvas,x,y,w,h,0,0,out.width,out.height);
+    const img = ctx.getImageData(0,0,out.width,out.height);
+    for(let i=0;i<img.data.length;i+=4) {
+      const gray = .299*img.data[i]+.587*img.data[i+1]+.114*img.data[i+2];
+      const value = Math.max(0,Math.min(255,(gray-128)*1.6+128));
+      img.data[i]=img.data[i+1]=img.data[i+2]=value;
+    }
+    ctx.putImageData(img,0,0);
+    return out;
+  };
+  window.parseText = function(text) {
+    const raw = String(text || '').replace(/[|]/g,' ').replace(/(?<=\d)[.,](?=\d{2}\b)/g,':');
+    const times = [...raw.matchAll(/(?<!\d)([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)(?!\d)/g)]
+      .map(m=>String(Number(m[1])).padStart(2,'0')+':'+m[2]);
+    const free = /freizeit|freize[t1]|\bfrei\b|urlaub|nicht\s*verf[üu]gbar/i.test(raw);
+    if(free && times.length===0) return {status:'frei',start:'',end:'',breakStart:'',breakEnd:'',department:'',raw:raw.trim()};
+    let start='',end='',breakStart='',breakEnd='',status='prüfen';
+    if(times.length>=4) {
+      [start,breakStart,breakEnd,end]=times.slice(0,4);
+      status='arbeit';
+    } else if(times.length===2) {
+      [start,end]=times;
+      status='arbeit';
+    }
+    if(free && times.length<2) status='frei';
+    return {status,start,end,breakStart,breakEnd,department:'',raw:raw.trim()};
+  };
+  document.getElementById('recognize').onclick = async function() {
+    if(!image) return alert('Bitte zuerst ein Foto auswählen.');
+    if(!selection || selection.bottom-selection.top<.004) return alert('Bitte nur deine schmale Zeitzeile markieren.');
+    savePrefs();
+    const monday=document.getElementById('monday').value;
+    if(!monday) return alert('Bitte den Montag der Woche auswählen.');
+    const btn=document.getElementById('recognize'),progress=document.getElementById('progress');
+    btn.disabled=true;
+    let worker;
+    try {
+      await loadOCR();
+      progress.textContent='Texterkennung wird geladen …';
+      worker=await Tesseract.createWorker('deu+eng',1,{
+        logger:m=>{if(m.status==='recognizing text')progress.textContent='Erkennung '+Math.round((m.progress||0)*100)+' %';}
+      });
+      await worker.setParameters({tessedit_pageseg_mode:'7'});
+      draft=[];
+      for(let i=0;i<6;i++) {
+        progress.textContent='Lese '+DAYS[i]+' ('+(i+1)+'/6) …';
+        const result=await worker.recognize(cropDay(i));
+        draft.push({date:addDays(monday,i),...parseText(result.data.text)});
+      }
+      renderDraft();
+      document.getElementById('results').hidden=false;
+      document.getElementById('results').scrollIntoView({behavior:'smooth'});
+      progress.textContent='Fertig. Bitte alle Zeiten kontrollieren – unklare Tage bleiben zur Prüfung markiert.';
+    } catch(e) {
+      progress.textContent='Fehler: '+e.message;
+    } finally {
+      if(worker) await worker.terminate();
+      btn.disabled=false;
+    }
+  };
+});
+</script>
+
+</body>
+</html>
