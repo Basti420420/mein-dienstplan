@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
+  <meta name="description" content="Dienstplan aus Foto erkennen und in den Kalender übernehmen">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <title>Mein Dienstplan</title>
+</head>
+<body>
+<header><div class="brand"><span class="brand-icon">▦</span><div><strong>Mein Dienstplan</strong><small>Foto → Schichten → Kalender</small></div></div><button id="install" class="ghost" hidden>Installieren</button></header>
+<main>
+  <section class="hero"><p class="eyebrow">DEIN PLAN. DEIN HANDY.</p><h1>Weniger abtippen.<br><em>Mehr Überblick.</em></h1><p>Fotografiere den Wochenplan oder lade ein Bild hoch. Markiere den Wochenbereich und deinen Mitarbeiterblock. Prüfe alle sechs Tage gemeinsam.</p></section>
+  <section class="card">
+    <div class="section-head"><h2>1 · Foto auswählen</h2><span class="pill">Lokal verarbeitet</span></div>
+    <div class="actions">
+      <label class="btn primary" for="photo" onclick="document.getElementById('photo').setAttribute('capture','environment')">📷 Foto aufnehmen</label>
+      <label class="btn" for="photo" onclick="document.getElementById('photo').removeAttribute('capture')">🖼️ Aus Galerie auswählen</label>
+      <input id="photo" type="file" accept="image/*">
+      <button id="demo" class="ghost">Beispiel anzeigen</button>
+    </div>
+    <p class="hint">Die Bilder bleiben auf deinem Gerät. Die Texterkennung benötigt beim ersten Mal Internet, um das Sprachmodell zu laden.</p>
+  </section>
+  <section id="selection" class="card" hidden>
+    <h2>2 · Ganze Woche und Mitarbeiter auswählen</h2>
+    <p><b>1. Wochenbereich:</b> Markiere von Montag oben links bis Samstag unten rechts. Die Mitarbeiterblöcke wiederholen sich darunter.</p>
+    <p><b>2. Dein Mitarbeiterblock:</b> Markiere darin die drei Zeilen mit Tagesstunden, Tätigkeit und Uhrzeiten. Die Auswahl gilt automatisch für alle sechs Tage. Fotografiere den Plan möglichst gerade, damit Zeilen und Spalten zusammenpassen.</p>
+    <div id="imageWrap"><canvas id="preview"></canvas><div id="selectionOverlay"></div></div>
+    <div hidden><input id="left" value="0"><input id="right" value="100"><input id="person"></div><label>Datum vom Montag im Plan<input id="monday" type="date"></label><p class="hint">Dieses Datum bitte aus der Kopfzeile übernehmen. Dienstag bis Samstag werden daraus berechnet.</p>
+    <div class="actions"><button id="recognize" class="btn primary">✨ Ganze Woche erkennen</button><button id="resetSelection" class="ghost">Wochenbereich neu markieren</button></div>
+    <button id="employeeSelection" class="ghost">Anderen Mitarbeiterblock markieren</button><p id="progress" class="hint" role="status"></p>
+  </section>
+  <section id="results" class="card" hidden>
+    <div class="section-head"><h2>3 · Dienste prüfen</h2><span class="pill">Bitte kontrollieren</span></div>
+    <p class="hint">Unklare Zeiten werden nicht erfunden. Bitte Datum und Schicht kontrollieren und gegebenenfalls manuell ergänzen.</p>
+    <div id="editDays"></div>
+    <div class="actions"><button id="save" class="btn primary">✓ Ganze Woche speichern</button></div>
+  </section>
+  <section class="card">
+    <div class="section-head"><h2>Meine gespeicherten Dienste</h2><button id="clear" class="ghost danger">Daten löschen</button></div>
+    <div id="saved"><p class="empty">Noch keine Dienste gespeichert.</p></div>
+    <div class="actions"><button id="ics" class="btn" disabled>📅 Kalenderdatei exportieren</button><button id="share" class="ghost" disabled>Teilen</button></div>
+    <p class="hint">Die Kalenderdatei enthält eine Erinnerung um 20:30 Uhr am Vorabend jedes Dienstes.</p>
+  </section>
+  <footer>Ohne Anmeldung · Keine Foto-Uploads · Daten nur auf diesem Gerät. Gespeicherte Dienste werden durch dieses Update nicht gelöscht.</footer>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), DAYS=['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'], STORE='mein-dienstplan-shifts-v1', PREF='mein-dienstplan-settings-v1';
+const stored=()=>{try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}};const prefs=()=>{try{return JSON.parse(localStorage.getItem(PREF)||'{}')}catch{return {}}};let image=null,selection=null,draft=[],installPrompt=null;
+const pad=n=>String(n).padStart(2,'0'),dateKey=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,addDays=(iso,n)=>{const [y,m,d]=iso.split('-').map(Number);const dt=new Date(y,m-1,d+n);return dateKey(dt)},escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function init(){const now=new Date(),mon=new Date(now);mon.setDate(now.getDate()-(now.getDay()+6)%7);$('monday').value=dateKey(mon);const p=prefs();$('person').value=p.person||'';$('left').value=p.left??23;$('right').value=p.right??94;selection=p.selection||null;$('photo').addEventListener('change',e=>loadFile(e.target.files?.[0]));$('recognize').onclick=recognize;$('resetSelection').onclick=()=>{selection=null;drawOverlay();$('progress').textContent='Bitte die Zeilen erneut markieren.'};$('save').onclick=save;$('clear').onclick=()=>{if(confirm('Alle gespeicherten Dienste auf diesem Gerät wirklich löschen?')){localStorage.removeItem(STORE);renderSaved()}};$('ics').onclick=exportICS;$('share').onclick=shareICS;$('demo').onclick=()=>{if(!image){alert('Bitte zuerst ein Foto auswählen.');return}selection={top:.13,bottom:.22};drawOverlay()};$('left').onchange=savePrefs;$('right').onchange=savePrefs;$('person').onchange=savePrefs;setupSelection();renderSaved();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('install').hidden=false});$('install').onclick=async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('install').hidden=true}}}
+function savePrefs(){localStorage.setItem(PREF,JSON.stringify({person:$('person').value.trim(),left:Number($('left').value),right:Number($('right').value),selection}))}
+async function loadFile(file){if(!file)return;try{const src=URL.createObjectURL(file),img=new Image();await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=src});image=img;const canvas=$('preview'),scale=Math.min(1,1200/img.naturalWidth);canvas.width=Math.round(img.naturalWidth*scale);canvas.height=Math.round(img.naturalHeight*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);URL.revokeObjectURL(src);$('selection').hidden=false;$('results').hidden=true;drawOverlay();$('progress').textContent='Markiere zuerst den Wochenbereich von Montag bis Samstag, danach deinen Mitarbeiterblock.';$('selection').scrollIntoView({behavior:'smooth',block:'start'})}catch(err){alert('Das Bild konnte nicht geöffnet werden: '+err.message)}}
+function setupSelection(){const wrap=$('imageWrap');let start=null;wrap.addEventListener('pointerdown',e=>{if(!image)return;wrap.setPointerCapture(e.pointerId);start=Math.max(0,Math.min(1,(e.clientY-wrap.getBoundingClientRect().top)/wrap.getBoundingClientRect().height));selection={top:start,bottom:start};drawOverlay()});wrap.addEventListener('pointermove',e=>{if(start===null)return;const y=Math.max(0,Math.min(1,(e.clientY-wrap.getBoundingClientRect().top)/wrap.getBoundingClientRect().height));selection={top:Math.min(start,y),bottom:Math.max(start,y)};drawOverlay()});wrap.addEventListener('pointerup',()=>{start=null;savePrefs()})}
+function drawOverlay(){const el=$('selectionOverlay');if(!selection){el.style.display='none';return}el.style.display='block';el.style.top=(selection.top*100)+'%';el.style.height=(Math.max(.005,selection.bottom-selection.top)*100)+'%'}
+async function loadOCR(){if(window.Tesseract)return;await new Promise((res,rej)=>{const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';script.onload=res;script.onerror=()=>rej(new Error('Texterkennung konnte nicht geladen werden. Bitte Internetverbindung prüfen.'));document.head.append(script)})}
+function cropDay(index){const canvas=$('preview'),left=Number($('left').value)/100,right=Number($('right').value)/100,top=selection.top,bottom=selection.bottom;if(!(right>left&&bottom-top>.012))throw new Error('Bitte Mitarbeiterzeilen und Spaltenbegrenzung korrekt markieren.');const x=Math.round(canvas.width*(left+(right-left)*index/6)),y=Math.round(canvas.height*top),w=Math.round(canvas.width*(right-left)/6),h=Math.round(canvas.height*(bottom-top));const out=document.createElement('canvas');out.width=Math.max(250,w*3);out.height=Math.max(130,h*3);const ctx=out.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(canvas,x,y,w,h,0,0,out.width,out.height);return out}
+function parseText(text){const raw=text.replace(/[|]/g,' ').replace(/(?<=\d)[.,](?=\d{2}\b)/g,':');const times=[...raw.matchAll(/(?<!\d)([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)(?!\d)/g)].map(m=>pad(Number(m[1]))+':'+m[2]);const free=/freizeit|\bfrei\b|urlaub|nicht verfügbar/i.test(raw);let status=free?'frei':'arbeit';let start=times[0]||'',end=times.length>=2?times[times.length-1]:'';let breakStart=times.length>=4?times[1]:'',breakEnd=times.length>=4?times[2]:'';const dept=(raw.match(/kasse|ware|lager|service|backshop|bäckerei|obst|gemüse|driftkraft|stv\s*team/i)||[])[0]||'';if(free&&times.length<2){start='';end='';breakStart='';breakEnd=''}if(!start||!end)status=free?'frei':'prüfen';return{status,start,end,breakStart,breakEnd,department:dept,raw:raw.trim()}}
+async function recognize(){if(!image)return alert('Bitte zuerst ein Foto auswählen.');if(!selection||selection.bottom-selection.top<.012)return alert('Bitte deine Mitarbeitergruppe im Foto markieren.');savePrefs();const monday=$('monday').value;if(!monday)return alert('Bitte den Montag der Woche auswählen.');$('recognize').disabled=true;let worker;try{await loadOCR();$('progress').textContent='OCR wird geladen …';worker=await Tesseract.createWorker('deu+eng',1,{logger:m=>{if(m.status==='recognizing text')$('progress').textContent=`Erkennung ${Math.round((m.progress||0)*100)} %`}});draft=[];for(let i=0;i<6;i++){$('progress').textContent=`Lese ${DAYS[i]} (${i+1}/6) …`;const crop=cropDay(i);const result=await worker.recognize(crop);draft.push({date:addDays(monday,i),...parseText(result.data.text)})}renderDraft();$('results').hidden=false;$('results').scrollIntoView({behavior:'smooth'});$('progress').textContent='Erkennung abgeschlossen. Bitte die Werte prüfen.'}catch(e){$('progress').textContent='Fehler: '+e.message+' Du kannst es mit einem schärferen Foto erneut versuchen.'}finally{if(worker)await worker.terminate();$('recognize').disabled=false}}
+function renderDraft(){const old=stored();$('editDays').innerHTML=draft.map((d,i)=>{const changed=old[d.date]&&JSON.stringify([old[d.date].start,old[d.date].end,old[d.date].breakStart,old[d.date].breakEnd,old[d.date].department])!==JSON.stringify([d.start,d.end,d.breakStart,d.breakEnd,d.department]);return `<div class="day ${changed?'changed':''}" data-i="${i}"><div class="day-head"><strong>${DAYS[i]} · ${d.date.slice(8)}.${d.date.slice(5,7)}.</strong>${changed?'<span class="changed-tag">Änderung prüfen</span>':''}</div><div class="day-grid"><label>Status<select data-field="status"><option value="arbeit" ${d.status==='arbeit'?'selected':''}>Arbeit</option><option value="frei" ${d.status==='frei'?'selected':''}>Frei / Urlaub</option><option value="prüfen" ${d.status==='prüfen'?'selected':''}>Unklar – prüfen</option></select></label><label>Abteilung<input data-field="department" value="${escapeHtml(d.department)}" placeholder="Ware / Kasse"></label><label>Beginn<input type="time" data-field="start" value="${d.start}"></label><label>Feierabend<input type="time" data-field="end" value="${d.end}"></label><label>Pause von<input type="time" data-field="breakStart" value="${d.breakStart}"></label><label>Pause bis<input type="time" data-field="breakEnd" value="${d.breakEnd}"></label></div><details><summary class="hint">Erkannten Text ansehen</summary><p class="hint">${escapeHtml(d.raw)||'Kein Text erkannt'}</p></details></div>`}).join('')}
+function save(){const data=stored();let count=0;for(const row of $('editDays').querySelectorAll('.day')){const i=Number(row.dataset.i),d={...draft[i]};for(const field of ['status','department','start','end','breakStart','breakEnd'])d[field]=row.querySelector(`[data-field="${field}"]`).value;if(d.status==='prüfen'){alert(`${DAYS[i]} ist noch unklar. Bitte den Status prüfen.`);return}if(d.status==='arbeit'&&(!d.start||!d.end)){alert(`${DAYS[i]}: Beginn und Feierabend fehlen.`);return}if(d.status==='frei'){d.start='';d.end='';d.breakStart='';d.breakEnd=''}delete d.raw;data[d.date]=d;count++}localStorage.setItem(STORE,JSON.stringify(data));renderSaved();$('results').hidden=true;alert(`${count} Tage gespeichert.`)}
+function renderSaved(){const data=stored(),keys=Object.keys(data).sort();$('saved').innerHTML=keys.length?keys.map(key=>{const d=data[key];return `<div class="saved-day"><div><b>${new Intl.DateTimeFormat('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}).format(new Date(key+'T12:00:00'))}</b><small>${escapeHtml(d.department||'Keine Abteilung')}</small></div><span>${d.status==='arbeit'?`${escapeHtml(d.start)}–${escapeHtml(d.end)}`:'Frei'}<small>${d.breakStart&&d.breakEnd?'Pause '+escapeHtml(d.breakStart)+'–'+escapeHtml(d.breakEnd):''}</small></span></div>`}).join(''):'<p class="empty">Noch keine Dienste gespeichert.</p>';$('ics').disabled=!keys.length;$('share').disabled=!keys.length}
+function icsEscape(s){return String(s).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;')};function icsDate(date,time){return date.replaceAll('-','')+'T'+time.replace(':','')+'00'}
+function buildICS(){const data=stored(),lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Mein Dienstplan//DE','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:Mein Dienstplan'];for(const date of Object.keys(data).sort()){const d=data[date];if(d.status!=='arbeit'||!d.start||!d.end)continue;const next=d.end<=d.start?addDays(date,1):date;lines.push('BEGIN:VEVENT','UID:'+date+'-'+d.start.replace(':','')+'@mein-dienstplan.local','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,''),'DTSTART;TZID=Europe/Berlin:'+icsDate(date,d.start),'DTEND;TZID=Europe/Berlin:'+icsDate(next,d.end),'SUMMARY:'+icsEscape('Dienst '+(d.department||'')),'DESCRIPTION:'+icsEscape(d.breakStart&&d.breakEnd?`Pause ${d.breakStart}–${d.breakEnd}`:'Pause nicht angegeben'),'BEGIN:VALARM','TRIGGER:-PT'+(210+Number(d.start.slice(0,2))*60+Number(d.start.slice(3)))+'M','ACTION:DISPLAY','DESCRIPTION:Dein Dienst morgen','END:VALARM','END:VEVENT')}lines.push('END:VCALENDAR');return lines.join('\r\n')+'\r\n'}
+function makeFile(){return new File([buildICS()],'mein-dienstplan.ics',{type:'text/calendar'})}function exportICS(){const blob=new Blob([buildICS()],{type:'text/calendar;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mein-dienstplan.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}async function shareICS(){if(navigator.canShare?.({files:[makeFile()]})&&navigator.share){try{await navigator.share({files:[makeFile()],title:'Mein Dienstplan'})}catch(e){if(e.name!=='AbortError')exportICS()}}else exportICS()}
+document.addEventListener('DOMContentLoaded',init);
+
+
+</script>
+<script>
+function parseDayField(text) {
+  const lines=String(text||'').split(/\r?\n/).map(l=>l.replace(/[|\[\]]/g,' ').trim()).filter(Boolean);
+  const dates=[...String(text).matchAll(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/g)].map(m=>`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`);
+  const validDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&!isNaN(Date.parse(d))&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d;
+  const date=dates.length===1&&validDate(dates[0])?dates[0]:'';
+  // Read only the last three content rows; header totals and header times are excluded.
+  const body=lines.filter(l=>! /\d{1,2}\.\d{1,2}\.\d{4}|00:01|23:59|soll|plan|\bvon\b|\bPV\b|\bPB\b|\bbis\b|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag/i.test(l)).slice(-3);
+  const raw=body.join('\n');
+  const hourLine=body.find(l=>/^\d{1,2}[,.]\d{2}$/.test(l));
+  const hours=hourLine?Number(hourLine.replace(',','.')):null;
+  const department=(raw.match(/kasse|ware|lager|drittkraft|filverantw/i)||[])[0]||'';
+  const free=/freizeit|\bfrei\b|urlaub|nicht\s*verf[üu]gbar/i.test(raw);
+  const timeRows=body.map(l=>[...l.matchAll(/(?<!\d)([01]?\d|2[0-3])\s*:\s*([0-5]\d)(?!\d)/g)].map(m=>m[1].padStart(2,'0')+':'+m[2])).filter(t=>t.length);
+  let start='',end='',breakStart='',breakEnd='',status='prüfen';
+  if(free&&!timeRows.length)status='frei';
+  else if(!free&&timeRows.length===1){const t=timeRows[0];if(t.length===4){[start,breakStart,breakEnd,end]=t;status='arbeit'}else if(t.length===2){[start,end]=t;status='arbeit'}}
+  const d={date,status,start,end,breakStart,breakEnd,department,hours,raw:String(text||'')};
+  const issues=validateDayField(d);
+  if(!date)issues.push('Datum nicht eindeutig erkannt. Bitte eintragen.');
+  if(!free&&hours===null)issues.push('Tagesstunden nicht erkannt. Bitte anhand des Fotos prüfen.');
+  if(!free&&!department)issues.push('Tätigkeit nicht erkannt. Bitte prüfen.');
+  if(issues.length)d.status='prüfen';
+  d.issues=issues;
+  return d;
+}
+function validateDayField(d){
+  const issues=[];if(d.status==='frei')return issues;
+  const valid=t=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+  if(!valid(d.start)||!valid(d.end)){issues.push('Arbeitsbeginn oder Arbeitsende fehlt.');return issues}
+  if(d.end<=d.start)issues.push('Arbeitsende muss nach Arbeitsbeginn liegen.');
+  if(Boolean(d.breakStart)!==Boolean(d.breakEnd))issues.push('Beide Pausenzeiten eintragen.');
+  if(d.breakStart&&(!valid(d.breakStart)||!valid(d.breakEnd)||!(d.start<=d.breakStart&&d.breakStart<d.breakEnd&&d.breakEnd<=d.end)))issues.push('Pause liegt nicht innerhalb der Arbeitszeit.');
+  const mins=t=>Number(t.slice(0,2))*60+Number(t.slice(3));
+  if(!issues.length&&d.hours!==null&&Math.abs((mins(d.end)-mins(d.start)-(d.breakStart?mins(d.breakEnd)-mins(d.breakStart):0))/60-d.hours)>.02)issues.push('Arbeitszeit minus Pause stimmt nicht mit den Tagesstunden überein.');
+  return issues;
+}
+window.addEventListener('load',()=>{
+  let week=null,band=null,anchor=null,mode='week',busy=false;
+  const old=$('imageWrap'),wrap=old.cloneNode(true);old.replaceWith(wrap);wrap.style.touchAction='none';
+  const overlay=$('selectionOverlay');overlay.style.right='auto';overlay.style.pointerEvents='none';
+  const bandOverlay=document.createElement('div');bandOverlay.style.cssText='position:absolute;pointer-events:none;border:3px solid #38d996;background:#38d99633;box-sizing:border-box;display:none';wrap.append(bandOverlay);
+  function rect(el,r){el.style.display=r?'block':'none';if(r){el.style.left=r.left*100+'%';el.style.top=r.top*100+'%';el.style.width=(r.right-r.left)*100+'%';el.style.height=(r.bottom-r.top)*100+'%'}}
+  function draw(){rect(overlay,week);rect(bandOverlay,band&&week?{...band,left:week.left,right:week.right}:null)}
+  function point(e){const r=$('preview').getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))}}
+  function hint(){ $('progress').textContent=mode==='week'?'1. Wochenbereich markieren: Montag oben links bis Samstag unten rechts, einschließlich der gewünschten Mitarbeiter.':'2. Deinen dreizeiligen Mitarbeiterblock über die ganze Woche markieren: Stunden, Tätigkeit und Uhrzeiten. Keine Nachbarperson einschließen.'; }
+  wrap.onpointerdown=e=>{if(!image||busy)return;e.preventDefault();wrap.setPointerCapture(e.pointerId);anchor=point(e)};
+  wrap.onpointermove=e=>{if(!anchor)return;const p=point(e),r={left:Math.min(anchor.x,p.x),right:Math.max(anchor.x,p.x),top:Math.min(anchor.y,p.y),bottom:Math.max(anchor.y,p.y)};if(mode==='week'){week=r;band=null}else if(week){band={top:Math.max(week.top,r.top),bottom:Math.min(week.bottom,r.bottom)}}draw()};
+  wrap.onpointerup=()=>{if(!anchor)return;anchor=null;if(mode==='week'&&week&&week.right-week.left>.05&&week.bottom-week.top>.02){mode='band';hint()}else if(band){$('progress').textContent='Mitarbeiterblock ausgewählt. Montagsdatum kontrollieren und ganze Woche erkennen.'}};
+  wrap.onpointercancel=()=>{anchor=null};
+  $('photo').addEventListener('change',()=>{week=band=selection=null;mode='week';draw();hint();$('monday').value=''});
+  $('resetSelection').onclick=()=>{if(busy)return;week=band=null;mode='week';draw();hint()};
+  $('employeeSelection').onclick=()=>{if(!week)return alert('Bitte zuerst den Wochenbereich markieren.');if(busy)return;band=null;mode='band';draw();hint()};
+  $('demo').textContent='Auswahlhilfe';$('demo').onclick=()=>alert('Erst alle sechs Tagesspalten von Montag bis Samstag markieren. Danach nur den eigenen dreizeiligen Mitarbeiterblock von oben nach unten auswählen. Die Breite übernimmt die App für die gesamte Woche. Das Datum oben als Montag eintragen. Für eine weitere Person bleibt der Wochenbereich erhalten.');
+  function crop(i){const out=document.createElement('canvas'),col=(week.right-week.left)/6,w=col*image.naturalWidth,h=(band.bottom-band.top)*image.naturalHeight,scale=Math.min(5,Math.max(1,1000/w));out.width=Math.max(1,Math.round(w*scale));out.height=Math.max(1,Math.round(h*scale));out.getContext('2d').drawImage(image,(week.left+i*col)*image.naturalWidth,band.top*image.naturalHeight,w,h,0,0,out.width,out.height);return out}
+  function show(){ $('results').hidden=false;$('editDays').innerHTML=draft.map((d,i)=>`<div class="day" data-i="${i}"><h3>${DAYS[i]} · ${escapeHtml(d.date)}</h3><p class="hint">${escapeHtml((d.issues||[]).join(' '))}</p><div class="day-grid"><label>Status<select data-field="status"><option value="prüfen">Bitte prüfen und wählen</option><option value="arbeit" ${d.status==='arbeit'?'selected':''}>Arbeit</option><option value="frei" ${d.status==='frei'?'selected':''}>Frei / Urlaub</option></select></label><label>Tagesstunden<input type="number" min="0" max="24" step="0.01" data-field="hours" value="${d.hours??''}"></label><label>Tätigkeit<input data-field="department" value="${escapeHtml(d.department)}"></label>${[['start','Arbeitsbeginn'],['breakStart','Pausenbeginn (PV)'],['breakEnd','Pausenende (PB)'],['end','Arbeitsende']].map(([f,label])=>`<label>${label}<input type="time" data-field="${f}" value="${escapeHtml(d[f])}"></label>`).join('')}</div><details><summary>Erkannten Text ansehen</summary><pre style="white-space:pre-wrap">${escapeHtml(d.raw)}</pre></details></div>`).join('');$('results').scrollIntoView({behavior:'smooth'}) }
+  $('recognize').onclick=async()=>{if(busy)return;if(!image||!week||!band||week.right-week.left<.05||band.bottom-band.top<.005)return alert('Bitte zuerst die Woche und dann deinen Mitarbeiterblock markieren.');const monday=$('monday').value;if(!monday||new Date(monday+'T12:00:00').getDay()!==1)return alert('Bitte das Montagsdatum aus dem Plan eintragen.');busy=true;let worker;draft=[];$('photo').disabled=true;$('recognize').disabled=true;$('monday').disabled=true;$('results').hidden=true;try{await loadOCR();worker=await Tesseract.createWorker('deu+eng');await worker.setParameters({tessedit_pageseg_mode:'6'});for(let i=0;i<6;i++){$('progress').textContent='Lese '+DAYS[i]+' ('+(i+1)+'/6) …';const r=await worker.recognize(crop(i)),date=addDays(monday,i);const [y,m,d]=date.split('-');draft.push(parseDayField(d+'.'+m+'.'+y+'\n'+r.data.text))}show();$('progress').textContent='Ganze Woche erkannt. Alle sechs Tage kontrollieren und gemeinsam speichern.'}catch(e){while(draft.length<6)draft.push({date:addDays(monday,draft.length),status:'prüfen',hours:null,department:'',start:'',end:'',breakStart:'',breakEnd:'',raw:'',issues:['Erkennung fehlgeschlagen: '+e.message+' – bitte manuell ergänzen.']});show();$('progress').textContent='Erkennung unvollständig. Fehlende Tage können manuell ergänzt werden.'}finally{if(worker)try{await worker.terminate()}catch{}busy=false;$('photo').disabled=false;$('recognize').disabled=false;$('monday').disabled=false}};
+  $('save').onclick=()=>{const data=stored();for(const row of $('editDays').querySelectorAll('.day')){const i=Number(row.dataset.i),d={date:draft[i].date};for(const f of ['status','department','start','end','breakStart','breakEnd'])d[f]=row.querySelector(`[data-field="${f}"]`).value;const h=row.querySelector('[data-field="hours"]').value;d.hours=h===''?null:Number(h);if(d.status==='prüfen')return alert(DAYS[i]+': Bitte kontrollieren und Arbeit oder Frei auswählen.');const issues=validateDayField(d);if(issues.length)return alert(DAYS[i]+': '+issues.join('\n'));if(d.status==='frei'){d.start=d.end=d.breakStart=d.breakEnd='';d.hours=null}data[d.date]=d}localStorage.setItem(STORE,JSON.stringify(data));renderSaved();$('results').hidden=true;$('progress').textContent='Montag bis Samstag gespeichert. Sonntag wurde nicht verändert.'};
+});
+
+</script>
+</body></html>
