@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
+  <meta name="description" content="Dienstplan aus Foto erkennen und in den Kalender übernehmen">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <title>Mein Dienstplan</title>
+</head>
+<body>
+<header><div class="brand"><span class="brand-icon">▦</span><div><strong>Mein Dienstplan</strong><small>Foto → Schichten → Kalender</small></div></div><button id="install" class="ghost" hidden>Installieren</button></header>
+<main>
+  <section class="hero"><p class="eyebrow">DEIN PLAN. DEIN HANDY.</p><h1>Weniger abtippen.<br><em>Mehr Überblick.</em></h1><p>Fotografiere den Wochenplan oder lade ein Bild hoch. Markiere deinen Mitarbeiterblock und prüfe anschließend die erkannten Dienste.</p></section>
+  <section class="card">
+    <div class="section-head"><h2>1 · Foto auswählen</h2><span class="pill">Lokal verarbeitet</span></div>
+    <div class="actions">
+      <label class="btn primary" for="photo" onclick="document.getElementById('photo').setAttribute('capture','environment')">📷 Foto aufnehmen</label>
+      <label class="btn" for="photo" onclick="document.getElementById('photo').removeAttribute('capture')">🖼️ Aus Galerie auswählen</label>
+      <input id="photo" type="file" accept="image/*">
+      <button id="demo" class="ghost">Beispiel anzeigen</button>
+    </div>
+    <p class="hint">Die Bilder bleiben auf deinem Gerät. Die Texterkennung benötigt beim ersten Mal Internet, um das Sprachmodell zu laden.</p>
+  </section>
+  <section id="selection" class="card" hidden>
+    <h2>2 · Deinen Mitarbeiterblock markieren</h2>
+    <p>Markiere <b>deinen gesamten Block aus drei Zeilen</b>: Tagesstunden, Tätigkeit (Kasse / Ware) und unten die Zeiten Von / PV / PB / Bis. Die Kopfzeilen mit Soll / Plan und 00:01–23:59 gehören nicht dazu. Stelle die seitlichen Grenzen auf die Montag- und Samstag-Spalte. Fotografiere den Plan möglichst gerade.</p>
+    <div id="imageWrap"><canvas id="preview"></canvas><div id="selectionOverlay"></div></div>
+    <div class="two">
+      <label>Beginn der Montag-Spalte (%)<input id="left" type="number" min="5" max="80" value="18"></label>
+      <label>Ende der Samstag-Spalte (%)<input id="right" type="number" min="20" max="100" value="97"></label>
+    </div>
+    <div class="two">
+      <label>Wochenbeginn (Montag)<input id="monday" type="date"></label>
+      <label>Mein Name (nur als Merkhilfe)<input id="person" type="text" placeholder="z. B. Sebastian"></label>
+    </div>
+    <div class="actions"><button id="recognize" class="btn primary">✨ Meine Woche erkennen</button><button id="resetSelection" class="ghost">Bereich neu markieren</button></div>
+    <p id="progress" class="hint" role="status"></p>
+  </section>
+  <section id="results" class="card" hidden>
+    <div class="section-head"><h2>3 · Dienste prüfen</h2><span class="pill">Bitte kontrollieren</span></div>
+    <p class="hint">Unklare Zeiten werden nicht erfunden. Bitte die sechs Tage kontrollieren und gegebenenfalls manuell ergänzen.</p>
+    <div id="editDays"></div>
+    <div class="actions"><button id="save" class="btn primary">✓ Woche speichern</button></div>
+  </section>
+  <section class="card">
+    <div class="section-head"><h2>Meine gespeicherten Dienste</h2><button id="clear" class="ghost danger">Daten löschen</button></div>
+    <div id="saved"><p class="empty">Noch keine Dienste gespeichert.</p></div>
+    <div class="actions"><button id="ics" class="btn" disabled>📅 Kalenderdatei exportieren</button><button id="share" class="ghost" disabled>Teilen</button></div>
+    <p class="hint">Die Kalenderdatei enthält eine Erinnerung um 20:30 Uhr am Vorabend jedes Dienstes.</p>
+  </section>
+  <footer>Ohne Anmeldung · Keine Foto-Uploads · Daten nur auf diesem Gerät. Gespeicherte Dienste werden durch dieses Update nicht gelöscht.</footer>
+</main>
+<script src="app.js" defer></script>
+<script>
+/* Verbesserte Center-Shop-Erkennung. Die bestehende Speicherung und Kalenderfunktion bleiben in app.js. */
+window.addEventListener('load', function () {
+  // Vorherige Spaltenwerte können aus einem älteren Foto stammen.
+  const p = document.getElementById('progress');
+  const photo = document.getElementById('photo');
+  photo.addEventListener('change', function () {
+    selection = null;
+    document.getElementById('selectionOverlay').style.display = 'none';
+    document.getElementById('left').value = '18';
+    document.getElementById('right').value = '97';
+    p.textContent = 'Bitte deinen Mitarbeiterblock neu markieren. Die Spaltengrenzen gelten nur für ein ähnlich aufgenommenes Foto.';
+  });
+  document.getElementById('demo').textContent = 'Auswahlhilfe';
+  document.getElementById('demo').onclick = function () {
+    alert('Markiere deinen gesamten dreizeiligen Mitarbeiterblock: Stunden, Tätigkeit und Zeiten. Von = Arbeitsbeginn, PV = Pausenbeginn, PB = Pausenende, Bis = Arbeitsende. Den Montag bitte vom Datum im Kopf übernehmen. Das Foto sollte möglichst gerade und nah aufgenommen sein.');
+  };
+
+  function parseShift(text) {
+    const raw = String(text || '').replace(/[|]/g,' ');
+    const lines = raw.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    // Decimal hours are deliberately NOT converted into clock times.
+    const times = value => [...value.matchAll(/(?<!\d)([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)(?!\d)/g)]
+      .map(m=>String(Number(m[1])).padStart(2,'0')+':'+m[2]);
+    const candidates = lines.filter(l=>! /soll|plan|00:01|23:59/i.test(l)).map(l=>({line:l,t:times(l)})).filter(v=>v.t.length>=2);
+    const free = /freizeit|freize[t1]|\bfrei\b|urlaub|nicht\s*verf[üu]gbar/i.test(raw);
+    const department = (raw.match(/kasse|ware|lager|service|backshop|bäckerei|obst|gemüse|drittkraft|filverantw/i)||[])[0]||'';
+    const hoursLine = lines.find(l=>/^\s*\d{1,2}[,.]\d{2}\s*$/.test(l));
+    const hours = hoursLine ? Number(hoursLine.replace(',','.')) : null;
+    let status='prüfen',start='',end='',breakStart='',breakEnd='';
+    const warnings=[];
+    if(free && !candidates.length) return {status:'frei',start,end,breakStart,breakEnd,department,raw:raw.trim()};
+    if(candidates.length===1 && !free) {
+      const t=candidates[0].t;
+      if(t.length===4) { [start,breakStart,breakEnd,end]=t; status='arbeit'; }
+      else if(t.length===2) { [start,end]=t; status='arbeit'; }
+      else warnings.push('Zeitzeile unvollständig oder mehrdeutig.');
+    } else warnings.push('Keine eindeutige Zeitzeile: bitte Markierung und Werte prüfen.');
+    const mins=t=>Number(t.slice(0,2))*60+Number(t.slice(3));
+    if(status==='arbeit') {
+      if(end<=start || (breakStart && !(start<=breakStart && breakStart<breakEnd && breakEnd<=end))) {
+        status='prüfen'; warnings.push('Reihenfolge von Arbeitszeit und Pause stimmt nicht.');
+      } else {
+        const net=(mins(end)-mins(start)-(breakStart?mins(breakEnd)-mins(breakStart):0))/60;
+        if(hours!==null && Math.abs(net-hours)>.02) {
+          status='prüfen'; warnings.push('Tagesstunden ('+hours+') passen nicht zu Arbeitszeit minus Pause ('+net.toFixed(2)+').');
+        }
+        if(!breakStart && hours===null) {
+          status='prüfen'; warnings.push('Nur zwei Zeiten erkannt: bitte prüfen, ob die Pause fehlt.');
+        }
+      }
+    }
+    return {status,start,end,breakStart,breakEnd,department,raw:raw.trim()+(warnings.length?'\nPrüfung: '+warnings.join(' '):'')};
+  }
+
+  function cropDayFull(index, extra=0) {
+    if (!image || !selection) throw new Error('Bitte ein Foto laden und deinen Mitarbeiterblock markieren.');
+    const left=Number(document.getElementById('left').value)/100;
+    const right=Number(document.getElementById('right').value)/100;
+    if (!(right>left) || selection.bottom-selection.top<.004) throw new Error('Die Markierung ist zu schmal oder die Spaltengrenzen stimmen nicht.');
+    const sourceW=image.naturalWidth, sourceH=image.naturalHeight;
+    const colW=sourceW*(right-left)/6;
+    const x=Math.max(0,Math.floor(sourceW*left+colW*index+colW*.01));
+    const w=Math.min(sourceW-x,Math.max(1,Math.floor(colW*.98)));
+    const y=Math.max(0,Math.floor(sourceH*Math.max(0,selection.top-extra)));
+    const bottom=Math.min(1,selection.bottom+extra);
+    const h=Math.max(1,Math.floor(sourceH*bottom-y));
+    const scale=Math.min(5,Math.max(2,900/w));
+    const out=document.createElement('canvas');
+    out.width=Math.max(1,Math.round(w*scale));out.height=Math.max(1,Math.round(h*scale));
+    const ctx=out.getContext('2d',{willReadFrequently:true});
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,out.width,out.height);
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+    ctx.drawImage(image,x,y,w,h,0,0,out.width,out.height);
+    return out;
+  }
+
+  document.getElementById('recognize').onclick = async function () {
+    if (!image) return alert('Bitte zuerst ein Foto auswählen.');
+    if (!selection || selection.bottom-selection.top<.004) return alert('Bitte deinen Mitarbeiterblock neu markieren.');
+    const monday=document.getElementById('monday').value;
+    if (!monday) return alert('Bitte den Montag der Woche auswählen.');
+    if (new Date(monday+'T12:00:00').getDay()!==1) return alert('Bitte das Montagsdatum aus dem Kopf des Plans auswählen.');
+    savePrefs();
+    const btn=this,progress=document.getElementById('progress');btn.disabled=true;
+    let worker;
+    draft=[];
+    try {
+      await loadOCR();
+      progress.textContent='Lade Texterkennung …';
+      worker=await Tesseract.createWorker('deu+eng',1,{
+        logger:m=>{if(m.status==='recognizing text')progress.textContent='Erkennung '+Math.round((m.progress||0)*100)+' %';}
+      });
+      draft=[];
+      for(let i=0;i<6;i++) {
+        progress.textContent='Lese '+DAYS[i]+' ('+(i+1)+'/6) …';
+        await worker.setParameters({tessedit_pageseg_mode:'6'});
+        const result=await worker.recognize(cropDayFull(i));
+        let best=parseShift(result.data.text);
+        draft.push({date:addDays(monday,i),...best});
+      }
+      renderDraft();
+      document.getElementById('results').hidden=false;
+      document.getElementById('results').scrollIntoView({behavior:'smooth'});
+      const uncertain=draft.filter(d=>d.status==='prüfen').length;
+      progress.textContent=uncertain ? 'Erkennung abgeschlossen. '+uncertain+' Tag(e) unklar – bitte die Zeiten manuell prüfen.' : 'Erkennung abgeschlossen. Bitte alle Zeiten kontrollieren.';
+    } catch(e) {
+      progress.textContent='Fehler bei der Texterkennung: '+e.message;
+      // Kein leerer Bildschirm: manuelle Eingabe immer ermöglichen.
+      if(!draft.length) {
+        draft=DAYS.map((_,i)=>({date:addDays(monday,i),status:'prüfen',start:'',end:'',breakStart:'',breakEnd:'',department:'',raw:'OCR-Fehler: '+e.message}));
+      }
+      renderDraft();
+      document.getElementById('results').hidden=false;
+    } finally {
+      if(worker) try { await worker.terminate(); } catch (_) {}
+      btn.disabled=false;
+    }
+  };
+});
+</script>
+</body>
+</html>
+
