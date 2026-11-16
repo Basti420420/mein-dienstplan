@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
+  <meta name="description" content="Dienstplan aus Foto erkennen und in den Kalender übernehmen">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <style>:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#ecf3ff;background:#0b1120;font-synthesis:none}*{box-sizing:border-box}body{margin:0}header{display:flex;align-items:center;justify-content:space-between;padding:17px max(18px,calc((100vw - 760px)/2));border-bottom:1px solid #253047;background:#101827}.brand{display:flex;align-items:center;gap:12px}.brand-icon{display:grid;place-items:center;width:43px;height:43px;background:#445dff;border-radius:13px;font-size:26px}.brand strong{display:block}.brand small{color:#9facbf}main{max-width:760px;margin:auto;padding:20px 15px 40px}.hero{padding:18px 8px 24px}.eyebrow{letter-spacing:.16em;color:#7ca8ff;font-size:11px;font-weight:800}h1{font-size:clamp(30px,6vw,46px);letter-spacing:-.05em;line-height:1.1;margin:12px 0}h1 em{font-style:normal;color:#7da2ff}.hero>p:last-child{color:#b6c4d7;line-height:1.6;max-width:550px}.card{background:#151f30;border:1px solid #2a3851;border-radius:19px;padding:19px;margin-bottom:17px;box-shadow:0 12px 35px #0002}.card h2{font-size:19px;margin:0 0 14px}.section-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.section-head h2{margin-bottom:13px}.pill{border:1px solid #36526b;border-radius:100px;padding:5px 9px;color:#9ecfd6;font-size:11px;white-space:nowrap}.actions{display:flex;gap:9px;flex-wrap:wrap;margin:15px 0 6px}.btn,.ghost{border:0;border-radius:11px;padding:12px 15px;font-size:14px;font-weight:750;cursor:pointer;text-align:center}.btn{background:#263a5b;color:white}.primary{background:#5475ff;color:white}.ghost{background:#223049;color:#d6e4ff}.danger{color:#ffaaa9}.btn:disabled{opacity:.45;cursor:default}#photo{position:absolute;width:1px;height:1px;opacity:0}.hint{font-size:12px;color:#a8b6c9;line-height:1.55}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}label{font-size:12px;color:#c2d0e0}input,select{display:block;width:100%;margin-top:6px;background:#0c1626;color:white;border:1px solid #40516c;border-radius:9px;padding:10px;min-width:0;font-size:15px}#imageWrap{position:relative;touch-action:none;user-select:none;overflow:hidden;border-radius:12px;border:1px solid #354966;margin-top:12px}#preview{width:100%;height:auto;display:block}#selectionOverlay{position:absolute;left:0;right:0;border:2px solid #75ffb2;background:#57ed9950;pointer-events:none;display:none}.day{padding:13px 0;border-top:1px solid #2a3950}.day-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.day-head strong{font-size:15px}.day-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.day label{font-size:11px}.day select,.day input{font-size:14px}.day.changed{border-left:3px solid #ffbf6b;padding-left:9px}.changed-tag{font-size:11px;color:#ffbf6b}.saved-day{padding:12px 0;border-bottom:1px solid #2a3950;display:flex;justify-content:space-between;gap:10px}.saved-day small{display:block;color:#91a6bd;margin-top:4px}.saved-day span{text-align:right}footer{font-size:12px;color:#8494ad;text-align:center;line-height:1.6;margin-top:22px}.empty{color:#a9b7c8;font-size:14px}@media(max-width:440px){.card{padding:14px}.two{grid-template-columns:1fr}.btn,.ghost{flex:1}header{padding:13px 15px}}
+
+</style>
+  <title>Mein Dienstplan</title>
+<style>#cellPreviews canvas{width:100%;height:auto}#cellPreviews strong{font-size:12px}#cellPreviews>div{min-width:0}#fieldGrid{border-radius:0}</style><style>#photoViewport{overflow:auto;max-height:65vh;min-height:180px;border:1px solid #526785;border-radius:12px;overscroll-behavior:contain}#photoViewport #imageWrap{margin:0;border:0;border-radius:0;max-width:none;width:100%}.photo-tools{position:sticky;top:0;z-index:5;background:#151f30;padding:6px 0}.photo-tools [aria-pressed="true"]{background:#5475ff;outline:2px solid #bbd2ff}#zoomValue{align-self:center}#photoZoom{min-height:40px;padding:0}#useLens{display:inline;width:auto}</style></head>
+<body>
+<header><div class="brand"><span class="brand-icon">▦</span><div><strong>Mein Dienstplan</strong><small>Foto → Schichten → Kalender</small></div></div><button id="install" class="ghost" hidden>Installieren</button></header>
+<main>
+  <section class="hero"><p class="eyebrow">DEIN PLAN. DEIN HANDY.</p><h1>Weniger abtippen.<br><em>Mehr Überblick.</em></h1><p>Fotografiere den Wochenplan oder lade ein Bild hoch. Tippe deine Uhrzeitzeile an. Prüfe alle sechs Tage gemeinsam.</p></section>
+  <section class="card">
+    <div class="section-head"><h2>1 · Foto auswählen</h2><span class="pill">Lokal verarbeitet</span></div>
+    <div class="actions">
+      <label class="btn primary" for="photo" onclick="document.getElementById('photo').setAttribute('capture','environment')">📷 Foto aufnehmen</label>
+      <label class="btn" for="photo" onclick="document.getElementById('photo').removeAttribute('capture')">🖼️ Aus Galerie auswählen</label>
+      <input id="photo" type="file" accept="image/*">
+      <button id="demo" class="ghost">Beispiel anzeigen</button>
+    </div>
+    <p class="hint">Die Bilder bleiben auf deinem Gerät. Die Texterkennung benötigt beim ersten Mal Internet, um das Sprachmodell zu laden.</p>
+  </section>
+  <section id="selection" class="card" hidden>
+    <h2>2 · Uhrzeitzeile antippen</h2>
+    <p><b>Trage das Montagsdatum ein und tippe auf eine Uhrzeit in deiner Zeile.</b> Die App sucht die Tabellenlinien und liest alle sechs Tage automatisch. Auf dem Foto muss die vollständige Woche von Montag bis Samstag sichtbar sein.</p>
+    <p class="hint">Pro Tag: <b>Beginn | Pause von | Pause bis | Ende</b>. Alle sechs Tagesspalten müssen vollständig sichtbar und ungefähr gleich breit sein.</p>
+    <label>Montagsdatum<input id="monday" type="date"></label>
+    <details><summary>Zusätzliche Lupe (optional)</summary><label><input id="useLens" type="checkbox"> Lupe beim Markieren anzeigen</label><div class="actions"><label>Lupe<select id="lensZoom"><option value="4">4×</option><option value="6" selected>6×</option><option value="8">8×</option></select></label><button id="hideLens" class="ghost">Lupe ausblenden</button></div></details>
+    <canvas id="selectionLens" width="600" height="360" hidden style="position:fixed;left:50%;transform:translateX(-50%);width:min(90vw,380px);height:auto;border:3px solid white;border-radius:12px;z-index:100;pointer-events:none"></canvas>
+    <div class="photo-tools"><div class="actions"><button id="panPhoto" class="btn" aria-pressed="true">✋ Bild verschieben</button><button id="markPhoto" class="btn" aria-pressed="false">👆 Zeile antippen</button></div><div class="actions"><button id="zoomOut" class="ghost" aria-label="Verkleinern">−</button><output id="zoomValue">100 %</output><button id="zoomIn" class="ghost" aria-label="Vergrößern">+</button><button id="zoomFit" class="ghost">Ganzes Bild</button></div><input id="photoZoom" aria-label="Fotozoom" type="range" min="100" max="600" step="10" value="100"><p id="photoMode" class="hint"></p></div>
+    <div id="photoViewport"><div id="imageWrap"><canvas id="preview"></canvas><div id="selectionOverlay"></div></div></div>
+    <div id="frameControls" hidden><p>Rahmen fein ausrichten</p><label>Links / rechts<input id="frame-x" type="range" min="0" max="100" step="0.1" style="min-height:44px;padding:0"></label><label>Hoch / runter<input id="frame-y" type="range" min="0" max="100" step="0.05" style="min-height:44px;padding:0"></label><label>Breite<input id="frame-width" type="range" min="3" max="99" step="0.1" style="min-height:44px;padding:0"></label><label>Höhe<input id="frame-height" type="range" min="0.8" max="30" step="0.05" style="min-height:44px;padding:0"></label><label>Schräglage<input id="frame-tilt" type="range" min="-12" max="12" step="0.05" style="min-height:44px;padding:0"></label></div>
+    <div hidden><input id="left"><input id="right"><input id="person"></div>
+
+    <div class="actions"><button id="resetSelection" class="ghost">Auswahl löschen</button><button id="previewFields" class="btn">Beschriftete Felder prüfen</button><button id="recognize" class="btn primary">Zeiten lesen</button></div>
+    <p id="progress" class="hint" role="status"></p>
+    <div id="cellPreviews" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px"></div>
+  </section>
+  <section id="results" class="card" hidden>
+    <div class="section-head"><h2>3 · Dienste prüfen</h2><span class="pill">Bitte kontrollieren</span></div>
+    <p class="hint">Vollständige Schichten werden automatisch als Arbeit, vier leere Zeitfelder als frei zugeordnet. Nur unklare Angaben musst du ergänzen. Vor dem Speichern kurz auf die Zeiten schauen.</p>
+    <div id="editDays"></div>
+    <div class="actions"><button id="save" class="btn primary">✓ Ganze Woche speichern</button></div>
+  </section>
+  <section class="card">
+    <div class="section-head"><h2>Meine gespeicherten Dienste</h2><button id="clear" class="ghost danger">Daten löschen</button></div>
+    <div id="saved"><p class="empty">Noch keine Dienste gespeichert.</p></div>
+    <div class="actions"><button id="ics" class="btn" disabled>📅 Kalenderdatei exportieren</button><button id="share" class="ghost" disabled>Teilen</button></div>
+    <p class="hint">Die Kalenderdatei enthält eine Erinnerung um 20:30 Uhr am Vorabend jedes Dienstes.</p>
+  </section>
+  <footer>Ohne Anmeldung · Keine Foto-Uploads · Daten nur auf diesem Gerät. Gespeicherte Dienste werden durch dieses Update nicht gelöscht.</footer>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), DAYS=['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'], STORE='mein-dienstplan-shifts-v1', PREF='mein-dienstplan-settings-v1';
+const stored=()=>{try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}};const prefs=()=>{try{return JSON.parse(localStorage.getItem(PREF)||'{}')}catch{return {}}};let image=null,selection=null,draft=[],installPrompt=null;
+const pad=n=>String(n).padStart(2,'0'),dateKey=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,addDays=(iso,n)=>{const [y,m,d]=iso.split('-').map(Number);const dt=new Date(y,m-1,d+n);return dateKey(dt)},escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function init(){const now=new Date(),mon=new Date(now);mon.setDate(now.getDate()-(now.getDay()+6)%7);$('monday').value=dateKey(mon);const p=prefs();$('person').value=p.person||'';$('left').value=p.left??23;$('right').value=p.right??94;selection=null;$('photo').addEventListener('change',e=>loadFile(e.target.files?.[0]));$('recognize').onclick=recognize;$('resetSelection').onclick=()=>{selection=null;drawOverlay();$('progress').textContent='Bitte die Zeilen erneut markieren.'};$('save').onclick=save;$('clear').onclick=()=>{if(confirm('Alle gespeicherten Dienste auf diesem Gerät wirklich löschen?')){localStorage.removeItem(STORE);renderSaved()}};$('ics').onclick=exportICS;$('share').onclick=shareICS;$('demo').onclick=()=>{if(!image){alert('Bitte zuerst ein Foto auswählen.');return}selection={top:.13,bottom:.22};drawOverlay()};$('left').onchange=savePrefs;$('right').onchange=savePrefs;$('person').onchange=savePrefs;setupSelection();renderSaved();if(location.protocol==='https:'&&'serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('install').hidden=false});$('install').onclick=async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('install').hidden=true}}}
+function savePrefs(){localStorage.setItem(PREF,JSON.stringify({person:$('person').value.trim(),left:Number($('left').value),right:Number($('right').value),selection}))}
+async function loadFile(file){if(!file)return;try{const src=URL.createObjectURL(file),img=new Image();await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=src});image=img;const canvas=$('preview'),scale=Math.min(1,1200/img.naturalWidth);canvas.width=Math.round(img.naturalWidth*scale);canvas.height=Math.round(img.naturalHeight*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);URL.revokeObjectURL(src);$('selection').hidden=false;$('results').hidden=true;drawOverlay();$('progress').textContent='Tippe auf eine Uhrzeit in deiner Zeile.';$('selection').scrollIntoView({behavior:'smooth',block:'start'})}catch(err){alert('Das Bild konnte nicht geöffnet werden: '+err.message)}}
+function setupSelection(){const wrap=$('imageWrap');let start=null;wrap.addEventListener('pointerdown',e=>{if(!image)return;wrap.setPointerCapture(e.pointerId);start=Math.max(0,Math.min(1,(e.clientY-wrap.getBoundingClientRect().top)/wrap.getBoundingClientRect().height));selection={top:start,bottom:start};drawOverlay()});wrap.addEventListener('pointermove',e=>{if(start===null)return;const y=Math.max(0,Math.min(1,(e.clientY-wrap.getBoundingClientRect().top)/wrap.getBoundingClientRect().height));selection={top:Math.min(start,y),bottom:Math.max(start,y)};drawOverlay()});wrap.addEventListener('pointerup',()=>{start=null;savePrefs()})}
+function drawOverlay(){const el=$('selectionOverlay');if(!selection){el.style.display='none';return}el.style.display='block';el.style.top=(selection.top*100)+'%';el.style.height=(Math.max(.005,selection.bottom-selection.top)*100)+'%'}
+async function loadOCR(){if(window.Tesseract)return;await new Promise((res,rej)=>{const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';script.onload=res;script.onerror=()=>rej(new Error('Texterkennung konnte nicht geladen werden. Bitte Internetverbindung prüfen.'));document.head.append(script)})}
+function cropDay(index){const canvas=$('preview'),left=Number($('left').value)/100,right=Number($('right').value)/100,top=selection.top,bottom=selection.bottom;if(!(right>left&&bottom-top>.012))throw new Error('Bitte Mitarbeiterzeilen und Spaltenbegrenzung korrekt markieren.');const x=Math.round(canvas.width*(left+(right-left)*index/6)),y=Math.round(canvas.height*top),w=Math.round(canvas.width*(right-left)/6),h=Math.round(canvas.height*(bottom-top));const out=document.createElement('canvas');out.width=Math.max(250,w*3);out.height=Math.max(130,h*3);const ctx=out.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,out.width,out.height);ctx.drawImage(canvas,x,y,w,h,0,0,out.width,out.height);return out}
+function parseText(text){const raw=text.replace(/[|]/g,' ').replace(/(?<=\d)[.,](?=\d{2}\b)/g,':');const times=[...raw.matchAll(/(?<!\d)([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)(?!\d)/g)].map(m=>pad(Number(m[1]))+':'+m[2]);const free=/freizeit|\bfrei\b|urlaub|nicht verfügbar/i.test(raw);let status=free?'frei':'arbeit';let start=times[0]||'',end=times.length>=2?times[times.length-1]:'';let breakStart=times.length>=4?times[1]:'',breakEnd=times.length>=4?times[2]:'';const dept=(raw.match(/kasse|ware|lager|service|backshop|bäckerei|obst|gemüse|driftkraft|stv\s*team/i)||[])[0]||'';if(free&&times.length<2){start='';end='';breakStart='';breakEnd=''}if(!start||!end)status=free?'frei':'prüfen';return{status,start,end,breakStart,breakEnd,department:dept,raw:raw.trim()}}
+async function recognize(){if(!image)return alert('Bitte zuerst ein Foto auswählen.');if(!selection||selection.bottom-selection.top<.012)return alert('Bitte deine Mitarbeitergruppe im Foto markieren.');savePrefs();const monday=$('monday').value;if(!monday)return alert('Bitte den Montag der Woche auswählen.');$('recognize').disabled=true;let worker;try{await loadOCR();$('progress').textContent='OCR wird geladen …';worker=await Tesseract.createWorker('deu+eng',1,{logger:m=>{if(m.status==='recognizing text')$('progress').textContent=`Erkennung ${Math.round((m.progress||0)*100)} %`}});draft=[];for(let i=0;i<6;i++){$('progress').textContent=`Lese ${DAYS[i]} (${i+1}/6) …`;const crop=cropDay(i);const result=await worker.recognize(crop);draft.push({date:addDays(monday,i),...parseText(result.data.text)})}renderDraft();$('results').hidden=false;$('results').scrollIntoView({behavior:'smooth'});$('progress').textContent='Erkennung abgeschlossen. Bitte die Werte prüfen.'}catch(e){$('progress').textContent='Fehler: '+e.message+' Du kannst es mit einem schärferen Foto erneut versuchen.'}finally{if(worker)await worker.terminate();$('recognize').disabled=false}}
+function renderDraft(){const old=stored();$('editDays').innerHTML=draft.map((d,i)=>{const changed=old[d.date]&&JSON.stringify([old[d.date].start,old[d.date].end,old[d.date].breakStart,old[d.date].breakEnd,old[d.date].department])!==JSON.stringify([d.start,d.end,d.breakStart,d.breakEnd,d.department]);return `<div class="day ${changed?'changed':''}" data-i="${i}"><div class="day-head"><strong>${DAYS[i]} · ${d.date.slice(8)}.${d.date.slice(5,7)}.</strong>${changed?'<span class="changed-tag">Änderung prüfen</span>':''}</div><div class="day-grid"><label>Status<select data-field="status"><option value="arbeit" ${d.status==='arbeit'?'selected':''}>Arbeit</option><option value="frei" ${d.status==='frei'?'selected':''}>Frei / Urlaub</option><option value="prüfen" ${d.status==='prüfen'?'selected':''}>Unklar – prüfen</option></select></label><label>Abteilung<input data-field="department" value="${escapeHtml(d.department)}" placeholder="Ware / Kasse"></label><label>Beginn<input type="time" data-field="start" value="${d.start}"></label><label>Feierabend<input type="time" data-field="end" value="${d.end}"></label><label>Pause von<input type="time" data-field="breakStart" value="${d.breakStart}"></label><label>Pause bis<input type="time" data-field="breakEnd" value="${d.breakEnd}"></label></div><details><summary class="hint">Erkannten Text ansehen</summary><p class="hint">${escapeHtml(d.raw)||'Kein Text erkannt'}</p></details></div>`}).join('')}
+function save(){const data=stored();let count=0;for(const row of $('editDays').querySelectorAll('.day')){const i=Number(row.dataset.i),d={...draft[i]};for(const field of ['status','department','start','end','breakStart','breakEnd'])d[field]=row.querySelector(`[data-field="${field}"]`).value;if(d.status==='prüfen'){alert(`${DAYS[i]} ist noch unklar. Bitte den Status prüfen.`);return}if(d.status==='arbeit'&&(!d.start||!d.end)){alert(`${DAYS[i]}: Beginn und Feierabend fehlen.`);return}if(d.status==='frei'){d.start='';d.end='';d.breakStart='';d.breakEnd=''}delete d.raw;data[d.date]=d;count++}localStorage.setItem(STORE,JSON.stringify(data));renderSaved();$('results').hidden=true;alert(`${count} Tage gespeichert.`)}
+function renderSaved(){const data=stored(),keys=Object.keys(data).sort();$('saved').innerHTML=keys.length?keys.map(key=>{const d=data[key];return `<div class="saved-day"><div><b>${new Intl.DateTimeFormat('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}).format(new Date(key+'T12:00:00'))}</b><small>${escapeHtml(d.department||'Keine Abteilung')}</small></div><span>${d.status==='arbeit'?`${escapeHtml(d.start)}–${escapeHtml(d.end)}`:'Frei'}<small>${d.breakStart&&d.breakEnd?'Pause '+escapeHtml(d.breakStart)+'–'+escapeHtml(d.breakEnd):''}</small></span></div>`}).join(''):'<p class="empty">Noch keine Dienste gespeichert.</p>';$('ics').disabled=!keys.length;$('share').disabled=!keys.length}
+function icsEscape(s){return String(s).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;')};function icsDate(date,time){return date.replaceAll('-','')+'T'+time.replace(':','')+'00'}
+function buildICS(){const data=stored(),lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Mein Dienstplan//DE','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:Mein Dienstplan'];for(const date of Object.keys(data).sort()){const d=data[date];if(d.status!=='arbeit'||!d.start||!d.end)continue;const next=d.end<=d.start?addDays(date,1):date;lines.push('BEGIN:VEVENT','UID:'+date+'-'+d.start.replace(':','')+'@mein-dienstplan.local','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,''),'DTSTART;TZID=Europe/Berlin:'+icsDate(date,d.start),'DTEND;TZID=Europe/Berlin:'+icsDate(next,d.end),'SUMMARY:'+icsEscape('Dienst '+(d.department||'')),'DESCRIPTION:'+icsEscape(d.breakStart&&d.breakEnd?`Pause ${d.breakStart}–${d.breakEnd}`:'Pause nicht angegeben'),'BEGIN:VALARM','TRIGGER:-PT'+(210+Number(d.start.slice(0,2))*60+Number(d.start.slice(3)))+'M','ACTION:DISPLAY','DESCRIPTION:Dein Dienst morgen','END:VALARM','END:VEVENT')}lines.push('END:VCALENDAR');return lines.join('\r\n')+'\r\n'}
+function makeFile(){return new File([buildICS()],'mein-dienstplan.ics',{type:'text/calendar'})}function exportICS(){const blob=new Blob([buildICS()],{type:'text/calendar;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mein-dienstplan.ics';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}async function shareICS(){if(navigator.canShare?.({files:[makeFile()]})&&navigator.share){try{await navigator.share({files:[makeFile()],title:'Mein Dienstplan'})}catch(e){if(e.name!=='AbortError')exportICS()}}else exportICS()}
+document.addEventListener('DOMContentLoaded',init);
+
+
+</script>
+<script>
+// Detect long horizontal rules around a tapped time row, then fit 25 vertical rules.
+function detectTimeGrid(gray,w,h,tap){
+  const tx=tap.x*w,ty=tap.y*h;
+  const dark=(x,y)=>{x=Math.round(x);y=Math.round(y);return x>=0&&x<w&&y>=0&&y<h?Math.max(0,(220-gray[y*w+x])/220):0};
+  const radius=Math.max(18,Math.min(65,h*.045));
+  const lines=[];
+  for(let yy=Math.max(1,Math.floor(ty-radius));yy<Math.min(h-1,ty+radius);yy++){
+    let best={score:0,y:yy,slope:0};
+    for(let slope=-.14;slope<=.1401;slope+=.003){let score=0;for(let j=0;j<160;j++){const x=w*(.025+.95*j/159),y=yy+slope*(x-tx);score+=Math.max(dark(x,y-1),dark(x,y),dark(x,y+1))}score/=160;if(score>best.score)best={score,y:yy,slope}}
+    lines.push(best);
+  }
+  const peaks=lines.filter((l,i)=>l.score>.42&&l.score>= (lines[i-1]?.score||0)&&l.score>=(lines[i+1]?.score||0));
+  let best=null;
+  for(const top of peaks.filter(l=>l.y<ty-2))for(const bottom of peaks.filter(l=>l.y>ty+2)){
+    const height=bottom.y-top.y;if(height<8||height>h*.04||Math.abs(top.slope-bottom.slope)>.015)continue;
+    const score=top.score+bottom.score-height/h*3;if(!best||score>best.score)best={top,bottom,score};
+  }
+  if(!best)throw Error('Keine eindeutigen Zeilengrenzen gefunden. Bitte mittig auf eine Uhrzeit tippen oder ein geraderes, schärferes Foto verwenden.');
+  const {top,bottom}=best;
+  const topY=x=>top.y+top.slope*(x-tx),botY=x=>bottom.y+bottom.slope*(x-tx);
+  const vertical=new Float32Array(w);
+  for(let x=2;x<w-2;x++){let v=0;for(let j=0;j<9;j++){const y=topY(x)+(botY(x)-topY(x))*(.2+.6*j/8);v+=Math.max(dark(x-1,y),dark(x,y),dark(x+1,y))}vertical[x]=v/9}
+  const near=x=>{let v=0;for(let dx=-6;dx<=6;dx++){const i=Math.round(x+dx);if(i>=0&&i<w)v=Math.max(v,vertical[i])}return v};
+  let grid=null;
+  for(let step=w*.62/24;step<=w*.96/24;step+=.15)for(let left=w*.015;left+step*24<w*.995;left+=1){
+    if(tx<left||tx>left+step*24)continue;let score=0,hits=0;for(let k=0;k<=24;k++){const v=near(left+k*step);score+=v;if(v>.42)hits++}score/=25;
+    if(!grid||score>grid.score)grid={left,step,score,hits};
+  }
+  if(!grid||grid.score<.43||grid.hits<20)throw Error('Die 24 Zeitfelder sind nicht eindeutig erkennbar. Bitte direkt auf die Zeile mit den Uhrzeiten tippen.');
+  const left=grid.left,right=left+24*grid.step;
+  const points=[{x:left/w,y:topY(left)/h},{x:right/w,y:topY(right)/h},{x:right/w,y:botY(right)/h},{x:left/w,y:botY(left)/h}];
+  if(points.some(p=>p.y<0||p.y>1))throw Error('Zeile liegt teilweise außerhalb des Fotos.');
+  const boundaries=Array.from({length:25},(_,k)=>{const expected=left+k*grid.step;let x=expected,bestScore=-1;for(let dx=-6;dx<=6;dx++){const at=Math.round(expected+dx);const score=(vertical[at]||0)-Math.abs(dx)*.003;if(score>bestScore){bestScore=score;x=at}}return x});
+  const cells=Array.from({length:24},(_,i)=>{const a=boundaries[i],b=boundaries[i+1];return [{x:a/w,y:topY(a)/h},{x:b/w,y:topY(b)/h},{x:b/w,y:botY(b)/h},{x:a/w,y:botY(a)/h}]});
+  return {points,cells,score:grid.score,hits:grid.hits};
+}
+
+const FIELD_NAMES=['Arbeitsbeginn','Pausenbeginn','Pausenende','Arbeitsende'];
+const FIELD_KEYS=['start','breakStart','breakEnd','end'];
+function readTimeCell(text,confidence=100){
+  const raw=String(text||'').trim();
+  const cleaned=raw.replace(/^[|\[\]\s]+|[|\[\]\s.,:]+$/g,'').replace(/\s+/g,'');
+  const m=cleaned.match(/^([01]?\d|2[0-3])[:.,]([0-5]\d)$/);
+  return {value:m?m[1].padStart(2,'0')+':'+m[2]:'',raw,confidence};
+}
+function classifyTimeDay(d){
+  if(d.cells.length===4&&d.cells.every(c=>c.blank===true))return 'frei';
+  if(d.start&&d.end&&!validateCellDay({...d,status:'arbeit'})&&
+    ((d.breakStart&&d.breakEnd)||(d.cells[1].blank===true&&d.cells[2].blank===true)))return 'arbeit';
+  return 'prüfen';
+}
+function timeCellBlank(canvas){
+  const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+  const x=Math.round(w*.12),y=Math.round(h*.22),iw=Math.round(w*.76),ih=Math.round(h*.56);
+  const p=ctx.getImageData(x,y,iw,ih).data;let dark=0;
+  for(let i=0;i<p.length;i+=4)if(.299*p[i]+.587*p[i+1]+.114*p[i+2]<125)dark++;
+  return dark/(iw*ih)<.003;
+}
+function contrastCell(canvas){
+  const out=document.createElement('canvas');out.width=canvas.width;out.height=canvas.height;
+  const ctx=out.getContext('2d');ctx.drawImage(canvas,0,0);const im=ctx.getImageData(0,0,out.width,out.height);
+  for(let i=0;i<im.data.length;i+=4){const g=.299*im.data[i]+.587*im.data[i+1]+.114*im.data[i+2],v=g<155?0:255;im.data[i]=im.data[i+1]=im.data[i+2]=v}ctx.putImageData(im,0,0);return out;
+}
+function cellCorners(points,i){const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});return [lerp(points[0],points[1],i/24),lerp(points[0],points[1],(i+1)/24),lerp(points[3],points[2],(i+1)/24),lerp(points[3],points[2],i/24)]}
+function validGrid(p){if(p.length!==4)return false;let sign=0;for(let i=0;i<4;i++){const a=p[i],b=p[(i+1)%4],c=p[(i+2)%4],cross=(b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x);if(Math.abs(cross)<.00001)return false;if(sign&&Math.sign(cross)!==sign)return false;sign=Math.sign(cross)}return p[1].x>p[0].x&&p[2].x>p[3].x&&p[3].y>p[0].y&&p[2].y>p[1].y}
+function validateCellDay(d){if(d.status==='frei')return '';const ok=t=>/^([01]\d|2[0-3]):[0-5]\d$/.test(t);if(!ok(d.start)||!ok(d.end))return 'Arbeitsbeginn und Arbeitsende fehlen.';if(d.end<=d.start)return 'Arbeitsende muss nach Arbeitsbeginn liegen.';if(Boolean(d.breakStart)!==Boolean(d.breakEnd))return 'Beide Pausenzeiten ergänzen oder beide leeren.';if(d.breakStart&&(!ok(d.breakStart)||!ok(d.breakEnd)||!(d.start<=d.breakStart&&d.breakStart<d.breakEnd&&d.breakEnd<=d.end)))return 'Pausenzeiten passen nicht zur Arbeitszeit.';return ''}
+window.addEventListener('load',()=>{
+  let points=[],editCorner=null,busy=false,down=null,crops=[],box=null,autoCells=null,panMode=false,zoom=1,panStart=null;
+  const old=$('imageWrap'),wrap=old.cloneNode(true);old.replaceWith(wrap);wrap.style.touchAction='none';
+  const viewport=$('photoViewport');
+  function setMode(pan){if(busy)return;panMode=pan;down=null;panStart=null;wrap.style.touchAction=pan?'pan-x pan-y':'none';wrap.style.cursor=pan?'grab':'crosshair';$('panPhoto').setAttribute('aria-pressed',String(pan));$('markPhoto').setAttribute('aria-pressed',String(!pan));$('photoMode').textContent=pan?'Bild verschieben: zum gewünschten Ausschnitt scrollen oder mit dem Finger schieben.':'Tippe mittig auf eine Uhrzeit deiner Zeile. Die App sucht Montag bis Samstag automatisch.';}
+  function setZoom(next){if(busy)return;const centerX=(viewport.scrollLeft+viewport.clientWidth/2)/(viewport.clientWidth*zoom),centerY=(viewport.scrollTop+viewport.clientHeight/2)/(wrap.offsetHeight||1);zoom=Math.max(1,Math.min(6,next));wrap.style.width=(zoom*100)+'%';$('photoZoom').value=Math.round(zoom*100);$('zoomValue').textContent=Math.round(zoom*100)+' %';viewport.scrollLeft=centerX*viewport.clientWidth*zoom-viewport.clientWidth/2;viewport.scrollTop=centerY*wrap.offsetHeight-viewport.clientHeight/2;}
+  $('photoZoom').oninput=()=>setZoom(Number($('photoZoom').value)/100);
+  $('zoomIn').onclick=()=>setZoom(zoom+.5);$('zoomOut').onclick=()=>setZoom(zoom-.5);$('zoomFit').onclick=()=>{setZoom(1);viewport.scrollLeft=viewport.scrollTop=0};
+  $('panPhoto').onclick=()=>setMode(false);$('markPhoto').onclick=()=>setMode(false);setMode(false);
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='fieldGrid';svg.setAttribute('viewBox','0 0 1000 1000');svg.setAttribute('preserveAspectRatio','none');svg.style.cssText='position:absolute;inset:0;width:100%;height:100%;pointer-events:none';wrap.append(svg);
+  const instructions=['Montag: obere linke Ecke deiner UHRZEITZEILE','Samstag: obere rechte Ecke deiner Uhrzeitzeile','Samstag: untere rechte Ecke deiner Uhrzeitzeile','Montag: untere linke Ecke deiner Uhrzeitzeile'];
+  function invalidate(){draft=[];crops=[];$('results').hidden=true;$('cellPreviews').innerHTML=''}
+  function draw(){svg.innerHTML='';function item(tag,attrs){const el=document.createElementNS(svg.namespaceURI,tag);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);svg.append(el);return el}if(validGrid(points))for(let i=0;i<24;i++){const c=autoCells?autoCells[i]:cellCorners(points,i);item('polygon',{points:c.map(p=>`${p.x*1000},${p.y*1000}`).join(' '),fill:i%4===0?'#60a5fa33':'#38d99622',stroke:i%4===0?'#5ea6ff':'#38d996','stroke-width':1.5});}$('frameControls').hidden=!box;hint()}
+  function hint(){$('progress').textContent=validGrid(points)?'Zeitzeile erkannt. Die beschrifteten Felder prüfen.':'Tippe mittig auf eine Uhrzeit deiner Zeile.'}
+  function setBox(b){autoCells=null;
+    const width=Math.min(.99,Math.max(.03,b.width)),height=Math.min(.3,Math.max(.008,b.height)),tilt=Math.max(-.12,Math.min(.12,b.tilt));
+    const margin=(height+Math.abs(tilt))/2;
+    box={width,height,tilt,x:Math.max(width/2,Math.min(1-width/2,b.x)),y:Math.max(margin,Math.min(1-margin,b.y))};
+    const l=box.x-width/2,r=box.x+width/2,t=box.y-height/2,bt=box.y+height/2;
+    points=[{x:l,y:t-tilt/2},{x:r,y:t+tilt/2},{x:r,y:bt+tilt/2},{x:l,y:bt-tilt/2}];
+    for(const k of ['x','y','width','height','tilt'])$('frame-'+k).value=(box[k]*100).toFixed(2);
+    invalidate();draw();
+  }
+  for(const k of ['x','y','width','height','tilt'])$('frame-'+k).oninput=()=>{if(busy||!box)return;setBox({...box,[k]:Number($('frame-'+k).value)/100})};
+  const lens=$('selectionLens'),lc=lens.getContext('2d');
+  function pos(e){const r=$('preview').getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))}}
+  function magnify(p,e){if(!$('useLens').checked)return;const w=image.naturalWidth/Number($('lensZoom').value),h=w*.6;lens.hidden=false;lens.style.top=e.clientY<window.innerHeight/2?'auto':'12px';lens.style.bottom=e.clientY<window.innerHeight/2?'12px':'auto';lc.fillStyle='white';lc.fillRect(0,0,600,360);lc.drawImage(image,p.x*image.naturalWidth-w/2,p.y*image.naturalHeight-h/2,w,h,0,0,600,360);lc.strokeStyle='#f35';lc.lineWidth=2;lc.beginPath();lc.moveTo(300,0);lc.lineTo(300,360);lc.moveTo(0,180);lc.lineTo(600,180);lc.stroke()}
+  async function selectRow(p){
+    if(busy)return;invalidate();points=[];autoCells=null;box=null;draw();busy=true;$('photo').disabled=true;$('progress').textContent='Suche Tabellenlinien und Zeitfelder …';
+    try{await new Promise(resolve=>setTimeout(resolve,30));const scan=document.createElement('canvas'),scale=Math.min(1,1200/image.naturalWidth);scan.width=Math.round(image.naturalWidth*scale);scan.height=Math.round(image.naturalHeight*scale);const ctx=scan.getContext('2d',{willReadFrequently:true});ctx.drawImage(image,0,0,scan.width,scan.height);const rgba=ctx.getImageData(0,0,scan.width,scan.height).data,gray=new Uint8Array(scan.width*scan.height);for(let i=0;i<gray.length;i++)gray[i]=Math.round(.299*rgba[i*4]+.587*rgba[i*4+1]+.114*rgba[i*4+2]);const found=detectTimeGrid(gray,scan.width,scan.height,p);points=found.points;autoCells=found.cells;draw();$('progress').textContent='Zeitzeile gefunden. Die grüne Auswahl kontrollieren.';
+    }catch(e){$('progress').textContent=e.message;return}finally{busy=false;$('photo').disabled=false}
+    if($('monday').value&&new Date($('monday').value+'T12:00:00').getDay()===1)await $('recognize').onclick();else $('progress').textContent='Zeile gefunden. Noch das Montagsdatum eintragen und „Zeiten lesen“ drücken.';
+  }
+  wrap.onpointerdown=e=>{if(!image||busy)return;if(panMode){if(e.pointerType==='mouse'){e.preventDefault();wrap.setPointerCapture(e.pointerId);panStart={x:e.clientX,y:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop}}return}e.preventDefault();wrap.setPointerCapture(e.pointerId);down={p:pos(e),x:e.clientX,y:e.clientY};magnify(down.p,e)};
+  wrap.onpointermove=e=>{if(panStart){viewport.scrollLeft=panStart.left-(e.clientX-panStart.x);viewport.scrollTop=panStart.top-(e.clientY-panStart.y)}};
+  wrap.onpointerup=e=>{if(panStart){panStart=null;return}if(!down)return;const start=down;down=null;lens.hidden=true;if(Math.hypot(e.clientX-start.x,e.clientY-start.y)<18)selectRow(pos(e));else $('progress').textContent='Zum Auswählen kurz auf eine Uhrzeit tippen. Zum Verschieben „Bild verschieben“ wählen.'};wrap.onpointercancel=()=>{panStart=null;down=null;lens.hidden=true};
+  $('hideLens').onclick=()=>lens.hidden=true;
+  function reset(){if(busy)return;points=[];autoCells=null;box=null;editCorner=null;selection=null;lens.hidden=true;invalidate();draw()}
+  $('resetSelection').onclick=reset;$('photo').addEventListener('change',()=>{reset();setZoom(1);setMode(false);$('monday').value=''});
+  $('demo').textContent='Auswahlhilfe';$('demo').onclick=()=>alert('Montagsdatum eintragen, dann auf eine Uhrzeit in deiner Zeile tippen. Die App erkennt die Tabellenlinien und liest die ganze Woche. Das Foto muss Montag bis Samstag vollständig zeigen. Zum Navigieren Bild verschieben wählen.');
+  // Map each quadrilateral cell into a rectangle using two affine triangles.
+  function makeCrop(i){const edges=autoCells?autoCells[i]:cellCorners(points,i);const mix=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});const at=(u,v)=>mix(mix(edges[0],edges[1],u),mix(edges[3],edges[2],u),v);const p=[at(.035,.07),at(.965,.07),at(.965,.93),at(.035,.93)].map(p=>({x:p.x*image.naturalWidth,y:p.y*image.naturalHeight}));const canvas=document.createElement('canvas');canvas.width=280;canvas.height=110;const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,280,110);const dest=[{x:12,y:10},{x:268,y:10},{x:268,y:100},{x:12,y:100}];
+    function triangle(ids){const [a,b,c]=ids.map(j=>p[j]),[u,v,w]=ids.map(j=>dest[j]);const det=(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);if(Math.abs(det)<.01)throw Error('Zeitzeile zu schmal.');const A=((v.x-u.x)*(c.y-a.y)-(w.x-u.x)*(b.y-a.y))/det,C=((w.x-u.x)*(b.x-a.x)-(v.x-u.x)*(c.x-a.x))/det,B=((v.y-u.y)*(c.y-a.y)-(w.y-u.y)*(b.y-a.y))/det,D=((w.y-u.y)*(b.x-a.x)-(v.y-u.y)*(c.x-a.x))/det;ctx.save();ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(v.x,v.y);ctx.lineTo(w.x,w.y);ctx.closePath();ctx.clip();ctx.setTransform(A,B,C,D,u.x-A*a.x-C*a.y,u.y-B*a.x-D*a.y);ctx.drawImage(image,0,0);ctx.restore()}
+    triangle([0,1,2]);triangle([0,2,3]);return canvas;
+  }
+  function preview(){if(!image||!validGrid(points))return false;crops=Array.from({length:24},(_,i)=>makeCrop(i));const target=$('cellPreviews');target.innerHTML='';for(let i=0;i<24;i++){const div=document.createElement('div'),label=document.createElement('strong');label.textContent=DAYS[Math.floor(i/4)]+' · '+FIELD_NAMES[i%4];div.append(label,crops[i]);target.append(div)}return true}
+  $('previewFields').onclick=()=>{if(busy)return;if(!preview())return alert('Bitte auf deine Uhrzeitzeile tippen.');lens.hidden=true;$('cellPreviews').scrollIntoView({behavior:'smooth'})};
+  function render(){ $('editDays').innerHTML=draft.map((d,i)=>`<div class="day" data-i="${i}"><h3>${DAYS[i]} · ${d.date}</h3><label>Status<select data-field="status"><option value="prüfen" ${d.status==='prüfen'?'selected':''}>Unklar – bitte prüfen</option><option value="arbeit" ${d.status==='arbeit'?'selected':''}>Arbeit</option><option value="frei" ${d.status==='frei'?'selected':''}>Frei / Urlaub</option></select></label><div class="day-grid">${FIELD_KEYS.map((f,j)=>`<label>${FIELD_NAMES[j]}<img alt="${FIELD_NAMES[j]} im Foto" src="${crops[i*4+j].toDataURL()}" style="width:100%;display:block;margin-top:8px"><input type="time" data-field="${f}" value="${d[f]}"><small>${escapeHtml(d.cells[j].value?'Erkannt: '+d.cells[j].value:d.cells[j].blank?'Leeres Feld':'Unklar – bitte prüfen')}</small></label>`).join('')}</div></div>`).join('');$('results').hidden=false;$('results').scrollIntoView({behavior:'smooth'}) }
+  $('recognize').onclick=async()=>{if(busy)return;const monday=$('monday').value;if(!monday||new Date(monday+'T12:00:00').getDay()!==1)return alert('Bitte das Montagsdatum eintragen.');if(!preview())return alert('Bitte auf deine Uhrzeitzeile tippen.');busy=true;editCorner=null;lens.hidden=true;$('photo').disabled=$('recognize').disabled=$('monday').disabled=true;$('results').hidden=true;draft=Array.from({length:6},(_,i)=>({date:addDays(monday,i),status:'prüfen',department:'',start:'',breakStart:'',breakEnd:'',end:'',cells:Array.from({length:4},()=>({value:'',raw:''}))}));let worker;try{await loadOCR();worker=await Tesseract.createWorker('eng');await worker.setParameters({tessedit_pageseg_mode:'7',tessedit_char_whitelist:'0123456789:.,'});for(let i=0;i<24;i++){$('progress').textContent=`Lese ${DAYS[Math.floor(i/4)]}: ${FIELD_NAMES[i%4]} (${i+1}/24)`;await worker.setParameters({tessedit_pageseg_mode:'7'});
+const r=await worker.recognize(crops[i]);let cell=readTimeCell(r.data.text,r.data.confidence);
+const blankPixels=timeCellBlank(crops[i]);
+if(!cell.value||r.data.confidence<60){
+ await worker.setParameters({tessedit_pageseg_mode:'13'});
+ const alt=await worker.recognize(contrastCell(crops[i]));const second=readTimeCell(alt.data.text,alt.data.confidence);
+ if(cell.value&&second.value&&cell.value!==second.value)cell={value:'',raw:cell.raw+' / '+second.raw,conflict:true};
+ else if(!cell.value&&second.value)cell=second;
+ cell.blank=!cell.value&&!cell.conflict&&!String(r.data.text||'').trim()&&!String(alt.data.text||'').trim()&&blankPixels;
+}else cell.blank=false;
+draft[Math.floor(i/4)].cells[i%4]=cell;draft[Math.floor(i/4)][FIELD_KEYS[i%4]]=cell.value;
+if(i%4===3)draft[Math.floor(i/4)].status=classifyTimeDay(draft[Math.floor(i/4)]);
+}
+const uncertain=draft.filter(d=>d.status==='prüfen').length;
+$('progress').textContent=uncertain?uncertain+' Tag(e) unklar. Die übrigen Tage sind automatisch zugeordnet.':'Woche erkannt: Arbeit und freie Tage automatisch zugeordnet. Du kannst die Woche direkt speichern.';
+}catch(e){$('progress').textContent='Erkennung unvollständig: '+e.message+'. Fehlende Zeiten bitte ergänzen.'}finally{if(worker)try{await worker.terminate()}catch{}busy=false;$('photo').disabled=$('recognize').disabled=$('monday').disabled=false;render()}};
+  $('save').onclick=()=>{const data=stored();for(const row of $('editDays').querySelectorAll('.day')){const i=Number(row.dataset.i),d={date:draft[i].date,department:'',status:row.querySelector('[data-field=status]').value};for(const f of FIELD_KEYS)d[f]=row.querySelector(`[data-field="${f}"]`).value;if(d.status==='prüfen')return alert(DAYS[i]+': Bitte Arbeit oder Frei bestätigen.');const error=validateCellDay(d);if(error)return alert(DAYS[i]+': '+error);if(d.status==='frei')for(const f of FIELD_KEYS)d[f]='';data[d.date]=d}localStorage.setItem(STORE,JSON.stringify(data));renderSaved();$('results').hidden=true;$('progress').textContent='Ganze Woche gespeichert.'};
+});
+
+</script></body></html>
